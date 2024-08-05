@@ -3,9 +3,9 @@ import 'package:ionicons/ionicons.dart';
 import 'feed_screen.dart';
 import 'search_screen.dart';
 import 'reels_screen.dart';
-import 'notifications_screen.dart';
 import 'profile_screen.dart';
 import 'messagingscreen.dart';
+import 'notifications_screen.dart'; // Keep this import for the AppBar navigation
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -19,7 +19,6 @@ class _HomeScreenState extends State<HomeScreen> {
     FeedScreen(),
     SearchScreen(),
     ReelsScreen(),
-    NotificationsScreen(),
     ProfileScreen(),
   ];
 
@@ -31,6 +30,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _navigateToMessaging() {
     Navigator.of(context).push(MaterialPageRoute(builder: (context) => MessagingScreen()));
+  }
+
+  void _navigateToNotifications() {
+    Navigator.of(context).push(MaterialPageRoute(builder: (context) => NotificationsScreen()));
   }
 
   @override
@@ -48,8 +51,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: Colors.transparent,
                 padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top, right: 10.0),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end, // Align icon to the right
+                  mainAxisAlignment: MainAxisAlignment.end, // Align icons to the right
                   children: [
+                    IconButton(
+                      icon: Icon(Ionicons.heart_outline, color: Colors.black),
+                      onPressed: _navigateToNotifications,
+                    ),
                     IconButton(
                       icon: Icon(Ionicons.paper_plane_outline, color: Colors.black),
                       onPressed: _navigateToMessaging,
@@ -79,11 +86,6 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Ionicons.videocam_outline),
             activeIcon: Icon(Ionicons.videocam),
             label: 'Reels',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Ionicons.heart_outline),
-            activeIcon: Icon(Ionicons.heart),
-            label: 'Notifications',
           ),
           BottomNavigationBarItem(
             icon: Icon(Ionicons.person_outline),

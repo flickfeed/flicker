@@ -1,9 +1,12 @@
+import 'package:flickfeedpro/models/comment.dart';
+
 class Post {
   final String imageUrl;
   final String username;
   final String caption;
-  final int likes;
+  int likes;
   final String avatarUrl;
+  final List<Comment> comments;
 
   Post({
     required this.imageUrl,
@@ -11,5 +14,6 @@ class Post {
     required this.caption,
     required this.likes,
     required this.avatarUrl,
+    required this.comments,
   });
 }

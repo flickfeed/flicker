@@ -1,44 +1,52 @@
 import 'package:flutter/material.dart';
-import 'package:flickfeedpro/data/dummy_data.dart';
-import 'package:flickfeedpro/models/posts.dart';
+import 'package:flickfeedpro/data/dummystories.dart';
+import 'package:flickfeedpro/data/dummy_data.dart'; // Ensure this points to the correct path
 import 'package:flickfeedpro/models/story.dart';
+import 'package:flickfeedpro/widgets/postwidgets.dart'; // Ensure this points to the correct path
 
 class FeedScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'FLICKFEED',
-          style: TextStyle(
-            fontFamily: 'Lobster',
-            fontSize: 32,
-          ),
-        ),
-      ),
-      body: Column(
-        children: [
-          Container(
-            height: 100,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: dummyStories.length + 1, // +1 for "Your Story"
-              itemBuilder: (context, index) {
-                if (index == 0) {
-                  return _buildYourStory(context);
-                }
-                final story = dummyStories[index - 1]; // Adjust for "Your Story"
-                return _buildStoryAvatar(story);
-              },
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            floating: true,
+            title: Text(
+              'FLICKFEED',
+              style: TextStyle(
+                fontFamily: 'Lobster',
+                fontSize: 32,
+              ),
             ),
           ),
-          Expanded(
-            child: ListView.builder(
-              itemCount: dummyPosts.length,
-              itemBuilder: (context, index) {
+          SliverToBoxAdapter(
+            child: Container(
+              padding: EdgeInsets.symmetric(vertical: 10.0),
+              height: 120, // Increased height to avoid overflow
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: dummyStories.length + 1, // +1 for "Your Story"
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    return _buildYourStory(context);
+                  }
+                  final story = dummyStories[index - 1]; // Adjust for "Your Story"
+                  return _buildStoryAvatar(story);
+                },
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Divider(height: 1.0, color: Colors.grey[300]),
+          ),
+          SliverList(
+            delegate: SliverChildBuilderDelegate(
+                  (context, index) {
                 final post = dummyPosts[index];
-                return PostItem(post: post);
+                return PostWidget(post: post);
               },
+              childCount: dummyPosts.length,
             ),
           ),
         ],
@@ -48,6 +56,7 @@ class FeedScreen extends StatelessWidget {
 
   Widget _buildYourStory(BuildContext context) {
     return Container(
+      width: 70, // Adjust the width as needed
       margin: EdgeInsets.symmetric(vertical: 10.0, horizontal: 5.0),
       child: Column(
         children: [
@@ -55,18 +64,24 @@ class FeedScreen extends StatelessWidget {
             alignment: Alignment.bottomRight,
             children: [
               CircleAvatar(
-                radius: 25, // Reduced the radius to avoid overflow
-                backgroundImage: AssetImage('assets/images/your_avatar.jpg'), // Your avatar image
+                radius: 30,
+                backgroundImage: AssetImage('assets/images/your_avatar.jpg'),
               ),
               CircleAvatar(
-                radius: 8, // Reduced the radius to avoid overflow
+                radius: 10,
                 backgroundColor: Colors.blue,
-                child: Icon(Icons.add, size: 12, color: Colors.white), // Adjusted icon size
+                child: Icon(Icons.add, size: 15, color: Colors.white),
               ),
             ],
           ),
           SizedBox(height: 5),
-          Text('Your Story', style: TextStyle(fontSize: 12)), // Adjusted text size
+          Expanded(
+            child: Text(
+              'Your Story',
+              style: TextStyle(fontSize: 12),
+              overflow: TextOverflow.ellipsis, // Ensure text does not overflow
+            ),
+          ),
         ],
       ),
     );
@@ -74,69 +89,22 @@ class FeedScreen extends StatelessWidget {
 
   Widget _buildStoryAvatar(Story story) {
     return Container(
+      width: 70, // Adjust the width as needed
       margin: EdgeInsets.symmetric(vertical: 10.0, horizontal: 5.0),
       child: Column(
         children: [
           CircleAvatar(
-            radius: 25, // Reduced the radius to avoid overflow
-            backgroundImage: AssetImage(story.imageUrl), // Story avatar image
+            radius: 30,
+            backgroundImage: AssetImage(story.imageUrl),
           ),
           SizedBox(height: 5),
-          Text(story.username, style: TextStyle(fontSize: 12)), // Adjusted text size
-        ],
-      ),
-    );
-  }
-}
-
-class PostItem extends StatelessWidget {
-  final Post post;
-
-  PostItem({required this.post});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.symmetric(vertical: 10.0, horizontal: 15.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ListTile(
-            leading: CircleAvatar(
-              backgroundImage: AssetImage(post.avatarUrl), // Use avatar URL
-            ),
-            title: Text(post.username),
-            subtitle: Text('2 hours ago'),
-          ),
-          Container(
-            height: 300, // Set a fixed height for the image container
-            width: double.infinity, // Make sure the container takes full width
-            child: AspectRatio(
-              aspectRatio: 1, // 1:1 aspect ratio for square image
-              child: Image.asset(post.imageUrl, fit: BoxFit.cover),
-            ),
-          ),
-          Padding(
-            padding: EdgeInsets.all(10.0),
-            child: Row(
-              children: [
-                IconButton(
-                  icon: Icon(Icons.favorite_border),
-                  onPressed: () {},
-                ),
-                SizedBox(width: 10.0),
-                Text('${post.likes} likes'),
-              ],
-            ),
-          ),
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 10.0),
+          Expanded(
             child: Text(
-              post.caption,
-              style: TextStyle(fontWeight: FontWeight.w500),
+              story.username,
+              style: TextStyle(fontSize: 12),
+              overflow: TextOverflow.ellipsis, // Ensure text does not overflow
             ),
           ),
-          SizedBox(height: 10.0),
         ],
       ),
     );
