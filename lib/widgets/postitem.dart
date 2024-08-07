@@ -18,7 +18,7 @@ class _PostItemState extends State<PostItem> {
   void _toggleLike() {
     setState(() {
       isLiked = !isLiked;
-      widget.post.likes += isLiked ? 1 : -1;
+      widget.post.toggleLike(isLiked);
     });
   }
 

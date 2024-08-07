@@ -7,6 +7,7 @@ class Comment {
   bool isLiked;
   bool isReplying;
   List<Comment> replies;
+  bool areRepliesVisible;
 
   Comment({
     required this.username,
@@ -17,5 +18,6 @@ class Comment {
     this.isLiked = false,
     this.isReplying = false,
     List<Comment>? replies,
+    this.areRepliesVisible = false,
   }) : replies = replies ?? [];
 }

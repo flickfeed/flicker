@@ -19,7 +19,7 @@ class _PostWidgetState extends State<PostWidget> {
   void _toggleLike() {
     setState(() {
       isLiked = !isLiked;
-      widget.post.likes += isLiked ? 1 : -1;
+      widget.post.toggleLike(isLiked);
     });
   }
 
@@ -94,10 +94,8 @@ class _PostWidgetState extends State<PostWidget> {
               backgroundImage: AssetImage(widget.post.avatarUrl),
             ),
           ),
-          title: GestureDetector(
-            onTap: () => _navigateToProfile(context, widget.post.username),
-            child: Text(widget.post.username),
-          ),
+          title: Text(widget.post.username),
+          subtitle: Text(widget.post.location),
           trailing: IconButton(
             icon: Icon(Icons.more_vert),
             onPressed: () => _showOptions(context),
@@ -107,9 +105,9 @@ class _PostWidgetState extends State<PostWidget> {
           widget.post.imageUrl,
           fit: BoxFit.cover,
           width: double.infinity,
+          height: 400,
         ),
         Row(
-          mainAxisAlignment: MainAxisAlignment.start,
           children: [
             IconButton(
               icon: Icon(
@@ -124,9 +122,7 @@ class _PostWidgetState extends State<PostWidget> {
             ),
             IconButton(
               icon: Icon(Ionicons.paper_plane_outline),
-              onPressed: () {
-                // Add share functionality here
-              },
+              onPressed: () {},
             ),
           ],
         ),
@@ -138,8 +134,14 @@ class _PostWidgetState extends State<PostWidget> {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-          child: Text(widget.post.caption),
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Row(
+            children: [
+              Text(widget.post.username, style: TextStyle(fontWeight: FontWeight.bold)),
+              SizedBox(width: 8),
+              Expanded(child: Text(widget.post.caption)),
+            ],
+          ),
         ),
         if (widget.post.comments.isNotEmpty)
           Padding(
