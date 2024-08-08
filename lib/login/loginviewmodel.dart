@@ -23,11 +23,9 @@ class LoginViewModel extends ChangeNotifier {
   Future<void> login(BuildContext context) async {
     if (formKey.currentState?.validate() ?? false) {
       formKey.currentState?.save();
-      loading = true;
-      notifyListeners();
-      await Future.delayed(Duration(seconds: 2));
-      loading = false;
-      notifyListeners();
+      setLoading(true);
+      await Future.delayed(Duration(seconds: 2)); // Simulating network request
+      setLoading(false);
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => HomeScreen()),
@@ -43,5 +41,10 @@ class LoginViewModel extends ChangeNotifier {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Password reset link sent to your email')),
     );
+  }
+
+  void setLoading(bool value) {
+    loading = value;
+    notifyListeners();
   }
 }

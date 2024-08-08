@@ -74,7 +74,8 @@ flutter:
       - assets/images/post2.jpg
       - assets/images/avatar1.jpg
       - assets/images/avatar2.jpg
-
+      - assets/images/login_illustration.png
+      - assets/images/Signup_illustration.png
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware
 
