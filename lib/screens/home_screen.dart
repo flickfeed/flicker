@@ -5,7 +5,7 @@ import 'search_screen.dart';
 import 'reels_screen.dart';
 import 'profile_screen.dart';
 import 'messagingscreen.dart';
-import 'notifications_screen.dart'; // Keep this import for the AppBar navigation
+import 'notifications_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -18,14 +18,49 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<Widget> _screens = [
     FeedScreen(),
     SearchScreen(),
+    Container(), // Placeholder for the New Post screen
     ReelsScreen(),
     ProfileScreen(),
   ];
 
   void _onTabTapped(int index) {
-    setState(() {
-      _currentIndex = index;
-    });
+    if (index == 2) {
+      _showNewPostModal();
+    } else {
+      setState(() {
+        _currentIndex = index;
+      });
+    }
+  }
+
+  void _showNewPostModal() {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return Container(
+          padding: EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: Icon(Icons.photo_library),
+                title: Text('Select from gallery'),
+                onTap: () {
+                  // Handle select from gallery
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.camera_alt),
+                title: Text('Take a photo'),
+                onTap: () {
+                  // Handle take a photo
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   void _navigateToMessaging() {
@@ -83,6 +118,13 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Search',
           ),
           BottomNavigationBarItem(
+            icon: Container(
+              margin: EdgeInsets.only(top: 8.0),
+              child: Icon(Icons.add_circle_outline, size: 30, color: Colors.black),
+            ),
+            label: '',
+          ),
+          BottomNavigationBarItem(
             icon: Icon(Ionicons.videocam_outline),
             activeIcon: Icon(Ionicons.videocam),
             label: 'Reels',
@@ -97,3 +139,4 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
+

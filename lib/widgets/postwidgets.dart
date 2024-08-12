@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flickfeedpro/models/posts.dart';
 import 'package:flickfeedpro/screens/usersprofilescreen.dart';
+import 'package:flickfeedpro/screens/sharepostscreen.dart';
+import 'package:flickfeedpro/screens/likesscreen.dart';
 import 'package:flickfeedpro/widgets/commentsectionwidget.dart';
 import 'package:ionicons/ionicons.dart';
 
@@ -23,6 +25,14 @@ class _PostWidgetState extends State<PostWidget> {
     });
   }
 
+  void _sharePost() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => SharePostScreen(post: widget.post),
+      ),
+    );
+  }
+
   void _showOptions(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -42,7 +52,7 @@ class _PostWidgetState extends State<PostWidget> {
               title: Text('Report'),
               onTap: () {
                 Navigator.pop(context);
-                // Add report functionality here
+                _reportPost();
               },
             ),
             ListTile(
@@ -50,7 +60,7 @@ class _PostWidgetState extends State<PostWidget> {
               title: Text('Hide this post'),
               onTap: () {
                 Navigator.pop(context);
-                // Add hide post functionality here
+                _hidePost();
               },
             ),
           ],
@@ -69,6 +79,9 @@ class _PostWidgetState extends State<PostWidget> {
           followerCount: 200,
           followingCount: 150,
           isFollowing: false,
+          name: 'John Doe', // Placeholder name
+          bio: 'Lorem ipsum dolor sit amet.', // Placeholder bio
+          mutualFollowers: ['user1', 'user2'], // Provide mutual followers here
         ),
       ),
     );
@@ -82,8 +95,33 @@ class _PostWidgetState extends State<PostWidget> {
     );
   }
 
+  void _reportPost() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Reported this post')),
+    );
+  }
+
+  void _hidePost() {
+    setState(() {
+      widget.post.isHidden = true;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Post hidden')),
+    );
+  }
+
+  void _showLikes(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => LikesScreen(likedUsers: widget.post.likedUsers),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (widget.post.isHidden) return SizedBox.shrink();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -122,15 +160,18 @@ class _PostWidgetState extends State<PostWidget> {
             ),
             IconButton(
               icon: Icon(Ionicons.paper_plane_outline),
-              onPressed: () {},
+              onPressed: _sharePost,
             ),
           ],
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Text(
-            '${widget.post.likes} likes',
-            style: TextStyle(fontWeight: FontWeight.bold),
+          child: GestureDetector(
+            onTap: () => _showLikes(context),
+            child: Text(
+              '${widget.post.likes} likes',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ),
         Padding(

@@ -1,4 +1,5 @@
-import 'comment.dart';  // Import Comment class
+import 'comment.dart';
+
 
 class Post {
   final String username;
@@ -8,6 +9,8 @@ class Post {
   int likes;
   final List<Comment> comments;
   final String location;
+  bool isHidden;
+  final List<String> likedUsers; // Add this property
 
   Post({
     required this.username,
@@ -17,6 +20,8 @@ class Post {
     this.likes = 0,
     this.comments = const [],
     this.location = '',
+    this.isHidden = false,
+    this.likedUsers = const [], // Initialize with an empty list
   });
 
   void toggleLike(bool isLiked) {
@@ -27,3 +32,4 @@ class Post {
     }
   }
 }
+

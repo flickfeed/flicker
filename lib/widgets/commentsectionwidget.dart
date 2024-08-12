@@ -212,43 +212,72 @@ class _CommentSectionState extends State<CommentSection> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Comments', style: TextStyle(fontSize: 18)),
-        centerTitle: true,
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              itemCount: widget.post.comments.length,
-              itemBuilder: (context, index) {
-                final comment = widget.post.comments[index];
-                return _buildCommentTile(comment, index, widget.post.comments);
-              },
-            ),
-          ),
-          Padding(
-            padding: EdgeInsets.all(8.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _commentController,
-                    decoration: InputDecoration(
-                      hintText: 'Add a comment...',
+    return GestureDetector(
+      onTap: () => Navigator.of(context).pop(),
+      child: Material(
+        color: Colors.black.withOpacity(0.4), // Dark semi-transparent background
+        child: GestureDetector(
+          onTap: () {}, // Prevents tap event from propagating to the outer GestureDetector
+          child: DraggableScrollableSheet(
+            initialChildSize: 0.5,
+            minChildSize: 0.3,
+            maxChildSize: 0.8,
+            builder: (_, controller) {
+              return Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                  boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 10)],
+                ),
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: widget.post.comments.length,
+                        itemBuilder: (context, index) {
+                          final comment = widget.post.comments[index];
+                          return _buildCommentTile(comment, index, widget.post.comments);
+                        },
+                      ),
                     ),
-                  ),
+                    Padding(
+                      padding: EdgeInsets.all(8.0),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _commentController,
+                              decoration: InputDecoration(
+                                hintText: 'Add a comment...',
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            icon: Icon(Ionicons.send_outline),
+                            onPressed: () => _addComment(_commentController.text),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                IconButton(
-                  icon: Icon(Ionicons.send_outline),
-                  onPressed: () => _addComment(_commentController.text),
-                ),
-              ],
-            ),
+              );
+            },
           ),
-        ],
+        ),
       ),
     );
   }
+}
+
+// To open the CommentSection as a popup
+void showCommentSection(BuildContext context, Post post) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (BuildContext context) {
+      return CommentSection(post: post);
+    },
+  );
 }
