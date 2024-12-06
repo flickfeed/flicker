@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "180135582739",
+    "project_id": "flickfeedflutter",
+    "storage_bucket": "flickfeedflutter.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:180135582739:android:400d4b78b8d339744cf3e6",
+        "android_client_info": {
+          "package_name": "com.example.flickfeedpro"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCkV2QuIdqWD77K5uAmRzVOe-D3_1zmKI0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

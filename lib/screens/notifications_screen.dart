@@ -1,35 +1,42 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; // Import Supabase
 
-class NotificationsScreen extends StatelessWidget {
-  final List<Map<String, dynamic>> _notifications = [
-    {
-      'type': 'like',
-      'username': '@user1',
-      'profilePicUrl': 'https://randomuser.me/api/portraits/men/1.jpg',
-      'time': '2h',
-    },
-    {
-      'type': 'comment',
-      'username': '@user2',
-      'profilePicUrl': 'https://randomuser.me/api/portraits/women/2.jpg',
-      'time': '3h',
-      'comment': 'Great post!',
-    },
-    {
-      'type': 'follow',
-      'username': '@user3',
-      'profilePicUrl': 'https://randomuser.me/api/portraits/men/3.jpg',
-      'time': '5h',
-    },
-    {
-      'type': 'mention',
-      'username': '@user4',
-      'profilePicUrl': 'https://randomuser.me/api/portraits/women/4.jpg',
-      'time': '1d',
-      'postPicUrl': 'https://via.placeholder.com/150',
-    },
-    // Add more notifications here
-  ];
+class NotificationsScreen extends StatefulWidget {
+  @override
+  _NotificationsScreenState createState() => _NotificationsScreenState();
+}
+
+class _NotificationsScreenState extends State<NotificationsScreen> {
+  final supabase = Supabase.instance.client; // Supabase instance
+  late Future<List<Map<String, dynamic>>> _notificationsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _notificationsFuture = _getNotifications('currentUserId'); // Replace with actual user ID
+  }
+
+  // Fetch notifications from Supabase for a specific user
+  Future<List<Map<String, dynamic>>> _getNotifications(String userId) async {
+    try {
+      final response = await supabase
+          .from('notifications') // Replace with your notifications table in Supabase
+          .select()
+          .eq('user_id', userId)
+          .order('timestamp', ascending: false)
+          .execute();
+
+      if (response.error == null) {
+        return List<Map<String, dynamic>>.from(response.data);
+      } else {
+        print('Failed to fetch notifications: ${response.error?.message}');
+        return [];
+      }
+    } catch (e) {
+      print('Error fetching notifications: $e');
+      return [];
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,17 +44,31 @@ class NotificationsScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text('Notifications'),
       ),
-      body: ListView.builder(
-        itemCount: _notifications.length,
-        itemBuilder: (context, index) {
-          final notification = _notifications[index];
-          return ListTile(
-            leading: CircleAvatar(
-              backgroundImage: NetworkImage(notification['profilePicUrl']),
-            ),
-            title: _buildNotificationText(notification),
-            subtitle: Text(notification['time']),
-            trailing: _buildNotificationTrailing(notification),
+      body: FutureBuilder<List<Map<String, dynamic>>>(
+        future: _notificationsFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator());
+          }
+          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return Center(child: Text('No notifications.'));
+          }
+
+          final notifications = snapshot.data!;
+
+          return ListView.builder(
+            itemCount: notifications.length,
+            itemBuilder: (context, index) {
+              final notification = notifications[index];
+              return ListTile(
+                leading: CircleAvatar(
+                  backgroundImage: NetworkImage(notification['profilePicUrl']),
+                ),
+                title: _buildNotificationText(notification),
+                subtitle: Text(_formatTime(notification['timestamp'])),
+                trailing: _buildNotificationTrailing(notification),
+              );
+            },
           );
         },
       ),
@@ -71,62 +92,28 @@ class NotificationsScreen extends StatelessWidget {
             ],
           ),
         );
-      case 'comment':
-        return RichText(
-          text: TextSpan(
-            children: [
-              TextSpan(
-                text: notification['username'],
-                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
-              ),
-              TextSpan(
-                text: ' commented: ',
-                style: TextStyle(color: Colors.black),
-              ),
-              TextSpan(
-                text: notification['comment'],
-                style: TextStyle(color: Colors.black),
-              ),
-            ],
-          ),
-        );
-      case 'follow':
-        return RichText(
-          text: TextSpan(
-            children: [
-              TextSpan(
-                text: notification['username'],
-                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
-              ),
-              TextSpan(
-                text: ' started following you.',
-                style: TextStyle(color: Colors.black),
-              ),
-            ],
-          ),
-        );
-      case 'mention':
-        return RichText(
-          text: TextSpan(
-            children: [
-              TextSpan(
-                text: notification['username'],
-                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
-              ),
-              TextSpan(
-                text: ' mentioned you in a comment.',
-                style: TextStyle(color: Colors.black),
-              ),
-            ],
-          ),
-        );
+    // Handle other notification types (comment, follow, mention)
       default:
         return Text('Unknown notification type.');
     }
   }
 
+  // Format timestamp
+  String _formatTime(String timestamp) {
+    DateTime dateTime = DateTime.parse(timestamp);
+    Duration difference = DateTime.now().difference(dateTime);
+
+    if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}m';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}h';
+    } else {
+      return '${difference.inDays}d';
+    }
+  }
+
   Widget? _buildNotificationTrailing(Map<String, dynamic> notification) {
-    if (notification['type'] == 'mention') {
+    if (notification['type'] == 'mention' && notification['postPicUrl'] != null) {
       return Image.network(notification['postPicUrl'], width: 50, height: 50);
     }
     return null;

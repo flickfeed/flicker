@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flickfeedpro/register/registerviewmodel.dart';
+import 'registerviewmodel.dart';
 
 class RegisterPage extends StatelessWidget {
   @override
@@ -11,79 +11,85 @@ class RegisterPage extends StatelessWidget {
         backgroundColor: Colors.white,
         body: Stack(
           children: [
-            // Top-left curve
+            // Decorative top-left curve
             Positioned(
               top: 0,
               left: 0,
               child: ClipPath(
                 clipper: TopLeftClipper(),
                 child: Container(
-                  color: Colors.blueAccent.withOpacity(0.6), // Adjust color
+                  color: Colors.blueAccent.withOpacity(0.6),
                   width: 150,
                   height: 150,
                 ),
               ),
             ),
-            // Bottom-right curve
+            // Decorative bottom-right curve
             Positioned(
               bottom: 0,
               right: 0,
               child: ClipPath(
                 clipper: BottomRightClipper(),
                 child: Container(
-                  color: Colors.blueAccent.withOpacity(0.6), // Adjust color
+                  color: Colors.blueAccent.withOpacity(0.6),
                   width: 150,
                   height: 150,
                 ),
               ),
             ),
+            // Main content
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20.0, vertical: 50.0),
+              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 50.0),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 250.0,
-                          height: 250.0,
-                          child: Image.asset(
-                            'assets/images/signup_illustration.png',
-                            fit: BoxFit.contain,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Illustration
+                          SizedBox(
+                            width: 250.0,
+                            height: 250.0,
+                            child: Image.asset(
+                              'assets/images/Signup_illustration.png',
+                              fit: BoxFit.contain,
+                            ),
                           ),
-                        ),
-                        SizedBox(height: 30.0),
-                        Text(
-                          'FlickFeed Sign Up',
-                          style: TextStyle(
-                            fontSize: 28.0,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
+                          const SizedBox(height: 30.0),
+                          // Page title
+                          const Text(
+                            'FlickFeed Sign Up',
+                            style: TextStyle(
+                              fontSize: 28.0,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
                           ),
-                        ),
-                        SizedBox(height: 20.0),
-                        buildForm(context),
-                      ],
+                          const SizedBox(height: 20.0),
+                          // Form section
+                          buildForm(context),
+                        ],
+                      ),
                     ),
                   ),
+                  // Navigation to Login
                   Column(
                     children: [
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text('Already have an account?'),
-                          SizedBox(width: 5.0),
+                          const Text('Already have an account?'),
+                          const SizedBox(width: 5.0),
                           GestureDetector(
                             onTap: () {
-                              Navigator.of(context).pop(); // Go back to the login page
+                              Navigator.of(context).pop();
                             },
-                            child: Text(
+                            child: const Text(
                               'Log In',
                               style: TextStyle(
-                                fontWeight: FontWeight.normal,
-                                color: Colors.black, // Light color for text
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue, // Highlighted color
                               ),
                             ),
                           ),
@@ -108,16 +114,12 @@ class RegisterPage extends StatelessWidget {
           autovalidateMode: AutovalidateMode.onUserInteraction,
           child: Column(
             children: [
+              // Username field
               TextFormField(
                 enabled: !viewModel.loading,
-                decoration: InputDecoration(
-                  labelText: 'Username',
-                  prefixIcon: Icon(Icons.person, color: Colors.black), // Black icon
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(30.0),
-                  ),
-                  filled: true,
-                  fillColor: Colors.white,
+                decoration: _inputDecoration(
+                  label: 'Username',
+                  icon: Icons.person,
                 ),
                 textInputAction: TextInputAction.next,
                 validator: (value) => value?.isEmpty ?? true ? "Please enter username" : null,
@@ -127,41 +129,41 @@ class RegisterPage extends StatelessWidget {
                   FocusScope.of(context).requestFocus(viewModel.emailFN);
                 },
               ),
-              SizedBox(height: 15.0),
+              const SizedBox(height: 15.0),
+              // Email field
               TextFormField(
                 enabled: !viewModel.loading,
-                decoration: InputDecoration(
-                  labelText: 'Email',
-                  prefixIcon: Icon(Icons.email, color: Colors.black), // Black icon
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(30.0),
-                  ),
-                  filled: true,
-                  fillColor: Colors.white,
+                decoration: _inputDecoration(
+                  label: 'Email',
+                  icon: Icons.email,
                 ),
                 textInputAction: TextInputAction.next,
-                validator: (value) => value?.isEmpty ?? true ? "Please enter email" : null,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter email';
+                  }
+                  final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
+                  if (!emailRegex.hasMatch(value)) {
+                    return 'Please enter a valid email';
+                  }
+                  return null;
+                },
                 onSaved: (value) => viewModel.setEmail(value ?? ''),
                 focusNode: viewModel.emailFN,
                 onFieldSubmitted: (_) {
                   FocusScope.of(context).requestFocus(viewModel.passFN);
                 },
               ),
-              SizedBox(height: 15.0),
+              const SizedBox(height: 15.0),
+              // Password field
               TextFormField(
                 enabled: !viewModel.loading,
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  prefixIcon: Icon(Icons.lock, color: Colors.black), // Black icon
-                  suffixIcon: IconButton(
-                    icon: Icon(viewModel.obscureText ? Icons.visibility_off : Icons.visibility, color: Colors.black),
-                    onPressed: viewModel.togglePasswordVisibility,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(30.0),
-                  ),
-                  filled: true,
-                  fillColor: Colors.white,
+                decoration: _inputDecoration(
+                  label: 'Password',
+                  icon: Icons.lock,
+                  isPassword: true,
+                  obscureText: viewModel.obscureText,
+                  toggleVisibility: viewModel.togglePasswordVisibility,
                 ),
                 obscureText: viewModel.obscureText,
                 textInputAction: TextInputAction.done,
@@ -169,8 +171,9 @@ class RegisterPage extends StatelessWidget {
                 onSaved: (value) => viewModel.setPassword(value ?? ''),
                 focusNode: viewModel.passFN,
               ),
-              SizedBox(height: 30.0),
-              Container(
+              const SizedBox(height: 30.0),
+              // Sign-Up button
+              SizedBox(
                 height: 45.0,
                 width: double.infinity,
                 child: ElevatedButton(
@@ -179,18 +182,13 @@ class RegisterPage extends StatelessWidget {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(30.0),
                     ),
-                    backgroundColor: Colors.blue, // Blue color for the button
-                    padding: EdgeInsets.symmetric(horizontal: 30.0, vertical: 10.0),
-                    textStyle: TextStyle(
-                      fontSize: 16.0,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    backgroundColor: Colors.blue,
                   ),
                   child: viewModel.loading
-                      ? CircularProgressIndicator(
+                      ? const CircularProgressIndicator(
                     valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                   )
-                      : Text(
+                      : const Text(
                     'SIGN UP',
                     style: TextStyle(color: Colors.white),
                   ),
@@ -200,6 +198,30 @@ class RegisterPage extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  InputDecoration _inputDecoration({
+    required String label,
+    required IconData icon,
+    bool isPassword = false,
+    bool obscureText = false,
+    VoidCallback? toggleVisibility,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon, color: Colors.black),
+      suffixIcon: isPassword
+          ? IconButton(
+        icon: Icon(obscureText ? Icons.visibility_off : Icons.visibility, color: Colors.black),
+        onPressed: toggleVisibility,
+      )
+          : null,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(30.0),
+      ),
+      filled: true,
+      fillColor: Colors.white,
     );
   }
 }

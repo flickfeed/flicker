@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'EditProfileScreen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -6,20 +7,68 @@ class ProfileScreen extends StatefulWidget {
   _ProfileScreenState createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen>
-    with SingleTickerProviderStateMixin {
-  String profileName = 'Anargh M';
-  String username = 'anarghm_';
-  String website = 'Video creator';
-  String bio = 'I lifts 🤡';
-  String profileImageUrl = 'https://example.com/profile_picture.jpg';
+class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProviderStateMixin {
+  String profileName = 'Username';
+  String username = 'username';
+  String website = '';
+  String bio = '';
+  String profileImageUrl = '';
+  int postsCount = 0;
+  int followersCount = 0;
+  int followingCount = 0;
+  bool isLoading = true;
 
   late TabController _tabController;
+
+  final SupabaseClient supabase = Supabase.instance.client;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
+    _fetchProfileData();
+  }
+
+  // Fetch user profile data from Supabase
+  Future<void> _fetchProfileData() async {
+    try {
+      final user = supabase.auth.currentUser;
+      if (user != null) {
+        final response = await supabase
+            .from('users') // Assuming your users are stored in a table named 'users'
+            .select()
+            .eq('id', user.id)
+            .single()
+            .execute();
+
+        if (response.error != null) {
+          print('Error fetching profile: ${response.error!.message}');
+        } else {
+          final userData = response.data as Map<String, dynamic>;
+          setState(() {
+            profileName = userData['profile_name'] ?? 'No Name';
+            username = userData['username'] ?? 'username';
+            website = userData['website'] ?? '';
+            bio = userData['bio'] ?? '';
+            profileImageUrl = userData['profile_image_url'] ?? '';
+            postsCount = userData['posts_count'] ?? 0;
+            followersCount = userData['followers_count'] ?? 0;
+            followingCount = userData['following_count'] ?? 0;
+            isLoading = false;
+          });
+        }
+      } else {
+        setState(() {
+          isLoading = false;
+        });
+        print('No user is logged in');
+      }
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+      print('Error fetching profile data: $e');
+    }
   }
 
   void _navigateToEditProfile(BuildContext context) async {
@@ -47,27 +96,15 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
   }
 
-  void _addNewHighlight() {
-    // Implement adding a new highlight
-  }
-
-  void _addNewStory() {
-    // Implement adding a new story
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(username),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.menu),
-            onPressed: () {},
-          ),
-        ],
+        title: Text(isLoading ? 'Loading...' : username),
       ),
-      body: ListView(
+      body: isLoading
+          ? Center(child: CircularProgressIndicator())
+          : ListView(
         children: [
           Padding(
             padding: const EdgeInsets.all(16.0),
@@ -75,72 +112,64 @@ class _ProfileScreenState extends State<ProfileScreen>
               children: [
                 Row(
                   children: [
-                    Stack(
+                    CircleAvatar(
+                      radius: 50,
+                      backgroundImage: profileImageUrl.isNotEmpty
+                          ? NetworkImage(profileImageUrl)
+                          : AssetImage('assets/images/default_avatar.png') as ImageProvider,
+                    ),
+                    SizedBox(width: 16),
+                    Column(
                       children: [
-                        CircleAvatar(
-                          radius: 40,
-                          backgroundImage: NetworkImage(profileImageUrl),
-                        ),
-                        Positioned(
-                          bottom: 0,
-                          right: 0,
-                          child: InkWell(
-                            onTap: _addNewStory,
-                            child: Icon(
-                              Icons.add_circle,
-                              color: Colors.blue,
-                              size: 24,
-                            ),
-                          ),
-                        ),
+                        Text(postsCount.toString()),
+                        Text('Posts'),
                       ],
                     ),
-                    Expanded(
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              _buildStatColumn('Posts', 5),
-                              _buildStatColumn('Followers', 607),
-                              _buildStatColumn('Following', 430),
-                            ],
-                          ),
-                          SizedBox(height: 8),
-                          ElevatedButton(
-                            onPressed: () => _navigateToEditProfile(context),
-                            child: Text('Edit Profile'),
-                          ),
-                        ],
-                      ),
+                    SizedBox(width: 16),
+                    Column(
+                      children: [
+                        Text(followersCount.toString()),
+                        Text('Followers'),
+                      ],
+                    ),
+                    SizedBox(width: 16),
+                    Column(
+                      children: [
+                        Text(followingCount.toString()),
+                        Text('Following'),
+                      ],
                     ),
                   ],
                 ),
-                SizedBox(height: 16),
-                _buildProfileInfo(),
-                SizedBox(height: 16),
-                Divider(),
-                _buildHighlightsSection(),
+                SizedBox(height: 10),
+                Text(profileName, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                SizedBox(height: 5),
+                Text(bio),
+                SizedBox(height: 5),
+                Text(website, style: TextStyle(color: Colors.blue)),
+                SizedBox(height: 10),
+                ElevatedButton(
+                  onPressed: () => _navigateToEditProfile(context),
+                  child: Text('Edit Profile'),
+                ),
               ],
             ),
           ),
+          Divider(),
           TabBar(
             controller: _tabController,
-            indicatorColor: Colors.white,
             tabs: [
               Tab(icon: Icon(Icons.grid_on)),
-              Tab(icon: Icon(Icons.video_library)),
-              Tab(icon: Icon(Icons.person_pin)),
+              Tab(icon: Icon(Icons.list)),
             ],
           ),
           Container(
-            height: MediaQuery.of(context).size.height * 0.5,
+            height: 400,
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildPostsGrid(),
-                _buildReelsSection(),
-                _buildTaggedSection(),
+                _buildGridPosts(),
+                _buildListPosts(),
               ],
             ),
           ),
@@ -149,129 +178,73 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  Widget _buildStatColumn(String label, int count) {
-    return Column(
-      children: [
-        Text(
-          '$count',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 16,
-            color: Colors.grey,
-          ),
-        ),
-      ],
-    );
-  }
+  // Fetch user's posts in grid layout
+  Widget _buildGridPosts() {
+    final userId = supabase.auth.currentUser?.id ?? '';
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: supabase
+          .from('posts') // Assuming posts are stored in 'posts' table
+          .select()
+          .eq('user_id', userId)
+          .order('created_at', ascending: false)
+          .stream(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return Center(child: CircularProgressIndicator());
+        }
 
-  Widget _buildProfileInfo() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          profileName,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        SizedBox(height: 4),
-        Text(username),
-        SizedBox(height: 4),
-        Text(website),
-        SizedBox(height: 4),
-        Text(bio),
-      ],
-    );
-  }
+        final posts = snapshot.data!;
 
-  Widget _buildHighlightsSection() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          Column(
-            children: [
-              Stack(
-                children: [
-                  CircleAvatar(
-                    radius: 30,
-                    backgroundColor: Colors.grey[300],
-                    child: Icon(Icons.add, color: Colors.grey),
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: InkWell(
-                      onTap: _addNewHighlight,
-                      child: Icon(
-                        Icons.add_circle,
-                        color: Colors.blue,
-                        size: 24,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 4),
-              Text('New'),
-            ],
+        return GridView.builder(
+          itemCount: posts.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            crossAxisSpacing: 2,
+            mainAxisSpacing: 2,
           ),
-          _buildHighlight('2024'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHighlight(String label) {
-    return Column(
-      children: [
-        CircleAvatar(
-          radius: 30,
-          backgroundImage: NetworkImage(
-              'https://example.com/highlight_image.jpg'),
-        ),
-        SizedBox(height: 4),
-        Text(label),
-      ],
-    );
-  }
-
-  Widget _buildPostsGrid() {
-    return GridView.builder(
-      physics: NeverScrollableScrollPhysics(),
-      shrinkWrap: true,
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3, // 3 posts per row
-        crossAxisSpacing: 2,
-        mainAxisSpacing: 2,
-      ),
-      itemBuilder: (context, index) {
-        return Container(
-          color: Colors.grey[300],
-          child: Image.network(
-            'https://example.com/post_image.jpg',
-            fit: BoxFit.cover,
-          ),
+          itemBuilder: (context, index) {
+            final post = posts[index];
+            final imageUrl = post['image_url'] ?? 'https://example.com/default_image.jpg';
+            return Image.network(imageUrl, fit: BoxFit.cover);
+          },
         );
       },
-      itemCount: 6,
     );
   }
 
-  Widget _buildReelsSection() {
-    // Replace with your Reels content
-    return Center(child: Text('Reels Section'));
-  }
+  // Fetch user's posts in list layout
+  Widget _buildListPosts() {
+    final userId = supabase.auth.currentUser?.id ?? '';
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: supabase
+          .from('posts')
+          .select()
+          .eq('user_id', userId)
+          .order('created_at', ascending: false)
+          .stream(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return Center(child: CircularProgressIndicator());
+        }
 
-  Widget _buildTaggedSection() {
-    // Replace with your Tagged content
-    return Center(child: Text('Tagged Section'));
+        final posts = snapshot.data!;
+
+        return ListView.builder(
+          itemCount: posts.length,
+          itemBuilder: (context, index) {
+            final post = posts[index];
+            final imageUrl = post['image_url'] ?? 'https://example.com/default_image.jpg';
+            final caption = post['caption'] ?? '';
+            return Column(
+              children: [
+                Image.network(imageUrl, fit: BoxFit.cover),
+                SizedBox(height: 8),
+                Text(caption),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 }

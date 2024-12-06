@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:ionicons/ionicons.dart';
 import 'home_screen.dart';
 import 'search_screen.dart';
-import 'reels_screen.dart';
 import 'activity_screen.dart';
 import 'profile_screen.dart';
 import 'feed_screen.dart';
+import 'package:flickfeedpro/screens/sharepostscreen.dart';
 
 class MainScreen extends StatefulWidget {
   @override
@@ -15,17 +15,11 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens;
-
-  _MainScreenState()
-      : _screens = [
-    FeedScreen(onScroll: (offset) {
-      // Handle scroll offset if needed
-    }),
+  late final List<Widget> _screens = [
+    FeedScreen(), // Provide required parameters if needed
     SearchScreen(),
-    ReelsScreen(),
     ActivityScreen(),
-    ProfileScreen(),
+    ProfileScreen(), // Replace with actual userId
   ];
 
   void _onTabTapped(int index) {
@@ -34,14 +28,18 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
+  void _handleNewPost() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => SharePostScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: _screens[_currentIndex],
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // Handle new post action
-        },
+        onPressed: _handleNewPost,
         child: Icon(Ionicons.add),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
@@ -61,13 +59,13 @@ class _MainScreenState extends State<MainScreen> {
             label: 'Search',
           ),
           BottomNavigationBarItem(
-            icon: SizedBox.shrink(), // Empty space for the floating button
+            icon: SizedBox.shrink(),
             label: '',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Ionicons.videocam_outline),
-            activeIcon: Icon(Ionicons.videocam),
-            label: 'Reels',
+            icon: Icon(Ionicons.notifications_outline),
+            activeIcon: Icon(Ionicons.notifications),
+            label: 'Activity',
           ),
           BottomNavigationBarItem(
             icon: Icon(Ionicons.person_outline),

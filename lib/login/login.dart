@@ -17,94 +17,105 @@ class _LoginPageState extends State<LoginPage> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          // Top-left curve
-          Positioned(
-            top: 0,
-            left: 0,
-            child: ClipPath(
-              clipper: TopLeftClipper(),
-              child: Container(
-                color: Colors.blueAccent.withOpacity(0.6),
-                width: 150,
-                height: 150,
-              ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: MediaQuery.of(context).size.height,
             ),
-          ),
-          // Bottom-right curve
-          Positioned(
-            bottom: 0,
-            right: 0,
-            child: ClipPath(
-              clipper: BottomRightClipper(),
-              child: Container(
-                color: Colors.blueAccent.withOpacity(0.6),
-                width: 150,
-                height: 150,
-              ),
-            ),
-          ),
-          // Page content
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20.0, vertical: 50.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Image.asset(
-                        'assets/images/login_illustration.png',
-                        height: 250.0,
-                        width: 250.0,
+            child: IntrinsicHeight(
+              child: Stack(
+                children: [
+                  // Top-left curve
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    child: ClipPath(
+                      clipper: TopLeftClipper(),
+                      child: Container(
+                        color: Colors.blueAccent.withOpacity(0.6),
+                        width: 150,
+                        height: 150,
                       ),
-                      SizedBox(height: 30.0),
-                      Text(
-                        'FlickFeed Login',
-                        style: TextStyle(
-                          fontSize: 28.0,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
-                        ),
-                      ),
-                      SizedBox(height: 20.0),
-                      buildForm(context, viewModel),
-                    ],
+                    ),
                   ),
-                ),
-                Column(
-                  children: [
-                    Row(
+                  // Bottom-right curve
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: ClipPath(
+                      clipper: BottomRightClipper(),
+                      child: Container(
+                        color: Colors.blueAccent.withOpacity(0.6),
+                        width: 150,
+                        height: 150,
+                      ),
+                    ),
+                  ),
+                  // Page content
+                  Padding(
+                    padding:
+                    const EdgeInsets.symmetric(horizontal: 20.0, vertical: 50.0),
+                    child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text('Don\'t have an account?'),
-                        SizedBox(width: 5.0),
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.of(context).push(
-                              CupertinoPageRoute(
-                                builder: (_) => RegisterPage(),
-                              ),
-                            );
-                          },
-                          child: Text(
-                            'Sign Up',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.secondary,
+                        Spacer(), // Pushes content to center
+                        Column(
+                          children: [
+                            Image.asset(
+                              'assets/images/login_illustration.png',
+                              height: 200.0,
+                              width: 200.0,
                             ),
-                          ),
+                            SizedBox(height: 30.0),
+                            Text(
+                              'LOGIN',
+                              style: TextStyle(
+                                fontSize: 28.0,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                              ),
+                            ),
+                            SizedBox(height: 20.0),
+                            buildForm(context, viewModel),
+                          ],
+                        ),
+                        Spacer(), // Pushes content upwards when keyboard appears
+                        Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text('Don\'t have an account?'),
+                                SizedBox(width: 5.0),
+                                GestureDetector(
+                                  onTap: () {
+                                    Navigator.of(context).push(
+                                      CupertinoPageRoute(
+                                        builder: (_) => RegisterPage(),
+                                      ),
+                                    );
+                                  },
+                                  child: Text(
+                                    'Sign Up',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Theme.of(context).colorScheme.secondary,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
-                ),
-              ],
+                  ),
+                ],
+              ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -141,9 +152,12 @@ class _LoginPageState extends State<LoginPage> {
             decoration: InputDecoration(
               prefixIcon: Icon(Ionicons.lock_closed_outline, color: Colors.black),
               suffixIcon: IconButton(
-                icon: Icon(viewModel.obscureText
-                    ? Ionicons.eye_off_outline
-                    : Ionicons.eye_outline, color: Colors.black),
+                icon: Icon(
+                  viewModel.obscureText
+                      ? Ionicons.eye_off_outline
+                      : Ionicons.eye_outline,
+                  color: Colors.black,
+                ),
                 onPressed: () {
                   setState(() {
                     viewModel.obscureText = !viewModel.obscureText;
@@ -223,36 +237,4 @@ class _LoginPageState extends State<LoginPage> {
       ),
     );
   }
-}
-
-// Top-left custom clipper
-class TopLeftClipper extends CustomClipper<Path> {
-  @override
-  Path getClip(Size size) {
-    Path path = Path();
-    path.lineTo(0, size.height);
-    path.quadraticBezierTo(size.width * 0.5, size.height * 0.5, size.width, 0);
-    path.close();
-    return path;
-  }
-
-  @override
-  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
-}
-
-// Bottom-right custom clipper
-class BottomRightClipper extends CustomClipper<Path> {
-  @override
-  Path getClip(Size size) {
-    Path path = Path();
-    path.moveTo(0, size.height);
-    path.lineTo(size.width, size.height);
-    path.lineTo(size.width, 0);
-    path.quadraticBezierTo(size.width * 0.5, size.height * 0.5, 0, size.height);
-    path.close();
-    return path;
-  }
-
-  @override
-  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
 }

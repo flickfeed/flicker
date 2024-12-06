@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; // Import Supabase
 
 class EditProfileScreen extends StatefulWidget {
   final String name;
@@ -26,6 +29,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late String _website;
   late String _bio;
   late String _imageUrl;
+  final ImagePicker _picker = ImagePicker();
+  File? _imageFile;
+
+  final supabase = Supabase.instance.client; // Supabase instance
 
   @override
   void initState() {
@@ -37,17 +44,55 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _imageUrl = widget.imageUrl;
   }
 
-  void _saveProfile() {
+  Future<void> _pickImage() async {
+    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      setState(() {
+        _imageFile = File(pickedFile.path);
+      });
+    }
+  }
+
+  Future<void> _saveProfile() async {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
+      String imageUrl = _imageUrl;
+      if (_imageFile != null) {
+        imageUrl = await _uploadImage(_imageFile!);
+      }
+
+      // Save updated data to Supabase (assuming you have a table 'userdetails')
+      final response = await supabase.from('userdetails').upsert({
+        'user_id': supabase.auth.currentUser!.id, // Use current user ID
+        'name': _name,
+        'username': _username,
+        'website': _website,
+        'bio': _bio,
+        'imageUrl': imageUrl,
+      }).execute();
+
+      if (response.error != null) {
+        print('Error updating profile: ${response.error?.message}');
+        return;
+      }
+
       Navigator.pop(context, {
         'name': _name,
         'username': _username,
         'website': _website,
         'bio': _bio,
-        'imageUrl': _imageUrl,
+        'imageUrl': imageUrl,
       });
     }
+  }
+
+  Future<String> _uploadImage(File imageFile) async {
+    // Upload the image to Supabase storage
+    final fileName = 'profile_images/${DateTime.now().toIso8601String()}.jpg';
+    final storageRef = supabase.storage.from('profile_images').upload(fileName, imageFile);
+    final fileUrl = await storageRef;
+
+    return fileUrl;
   }
 
   @override
@@ -73,16 +118,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   children: [
                     CircleAvatar(
                       radius: 50,
-                      backgroundImage: NetworkImage(_imageUrl),
+                      backgroundImage: _imageFile != null
+                          ? FileImage(_imageFile!)
+                          : NetworkImage(_imageUrl) as ImageProvider,
                     ),
                     Positioned(
                       bottom: 0,
                       right: 0,
                       child: IconButton(
                         icon: Icon(Icons.camera_alt),
-                        onPressed: () {
-                          // Implement image picker
-                        },
+                        onPressed: _pickImage,
                       ),
                     ),
                   ],

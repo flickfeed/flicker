@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:ionicons/ionicons.dart';
-import 'package:flickfeedpro/data/dummystories.dart';
-import 'package:flickfeedpro/data/dummy_data.dart';
-import 'package:flickfeedpro/models/story.dart';
 import 'package:flickfeedpro/widgets/postwidgets.dart';
+import 'package:flickfeedpro/models/posts.dart';
 import 'package:flutter/rendering.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class FeedScreen extends StatefulWidget {
   @override
@@ -12,37 +11,92 @@ class FeedScreen extends StatefulWidget {
 }
 
 class _FeedScreenState extends State<FeedScreen> {
-  ScrollController _scrollController = ScrollController();
+  List<Map<String, dynamic>> _stories = [];
+  List<Post> _posts = [];
+  bool _isLoadingStories = true;
+  bool _isLoadingPosts = true;
+  final ScrollController _scrollController = ScrollController();
   bool _showIcons = true;
   double _iconOpacity = 1.0;
 
   @override
   void initState() {
     super.initState();
-    _scrollController.addListener(() {
-      // Check the direction of the scroll
-      if (_scrollController.position.userScrollDirection == ScrollDirection.reverse) {
-        if (_showIcons) {
-          setState(() {
-            _iconOpacity = 0.0; // Fade out the icons
-            _showIcons = false;
-          });
-        }
-      } else if (_scrollController.position.userScrollDirection == ScrollDirection.forward) {
-        if (!_showIcons) {
-          setState(() {
-            _iconOpacity = 1.0; // Fade in the icons
-            _showIcons = true;
-          });
-        }
-      }
-    });
+    _fetchStories();
+    _fetchPosts();
+    _setupScrollListener();
   }
 
   @override
   void dispose() {
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _setupScrollListener() {
+    _scrollController.addListener(() {
+      if (_scrollController.position.userScrollDirection == ScrollDirection.reverse && _showIcons) {
+        setState(() {
+          _iconOpacity = 0.0;
+          _showIcons = false;
+        });
+      } else if (_scrollController.position.userScrollDirection == ScrollDirection.forward && !_showIcons) {
+        setState(() {
+          _iconOpacity = 1.0;
+          _showIcons = true;
+        });
+      }
+    });
+  }
+
+  Future<void> _fetchStories() async {
+    try {
+      final response = await Supabase.instance.client
+          .from('stories')
+          .select('*')
+          .order('timestamp', ascending: false)
+          .execute();
+
+      if (response.error == null) {
+        setState(() {
+          _stories = List<Map<String, dynamic>>.from(response.data);
+          _isLoadingStories = false;
+        });
+      } else {
+        throw response.error!;
+      }
+    } catch (e) {
+      print('Error fetching stories: $e');
+      setState(() {
+        _isLoadingStories = false;
+      });
+    }
+  }
+
+  Future<void> _fetchPosts() async {
+    try {
+      final response = await Supabase.instance.client
+          .from('posts')
+          .select('*')
+          .order('timestamp', ascending: false)
+          .execute();
+
+      if (response.error == null) {
+        setState(() {
+          _posts = (response.data as List<dynamic>)
+              .map((post) => Post.fromMap(post as Map<String, dynamic>))
+              .toList();
+          _isLoadingPosts = false;
+        });
+      } else {
+        throw response.error!;
+      }
+    } catch (e) {
+      print('Error fetching posts: $e');
+      setState(() {
+        _isLoadingPosts = false;
+      });
+    }
   }
 
   @override
@@ -63,37 +117,14 @@ class _FeedScreenState extends State<FeedScreen> {
                   ),
                 ),
               ),
-              SliverToBoxAdapter(
-                child: Container(
-                  padding: EdgeInsets.symmetric(vertical: 10.0),
-                  height: 120,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: dummyStories.length + 1,
-                    itemBuilder: (context, index) {
-                      if (index == 0) {
-                        return _buildYourStory(context);
-                      }
-                      final story = dummyStories[index - 1];
-                      return _buildStoryAvatar(story);
-                    },
-                  ),
-                ),
-              ),
+              _buildStoriesSection(),
               SliverToBoxAdapter(
                 child: Divider(height: 1.0, color: Colors.grey[300]),
               ),
-              SliverList(
-                delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                    final post = dummyPosts[index];
-                    return PostWidget(post: post);
-                  },
-                  childCount: dummyPosts.length,
-                ),
-              ),
+              _buildPostsSection(),
             ],
           ),
+          if (_isLoadingPosts) Center(child: CircularProgressIndicator()),
           Positioned(
             top: 0,
             left: 0,
@@ -103,22 +134,14 @@ class _FeedScreenState extends State<FeedScreen> {
               duration: Duration(milliseconds: 300),
               child: Container(
                 color: Colors.transparent,
-                padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top, right: 10.0),
+                padding: EdgeInsets.only(
+                  top: MediaQuery.of(context).padding.top,
+                  right: 10.0,
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    IconButton(
-                      icon: Icon(Ionicons.heart_outline, color: Colors.black),
-                      onPressed: () {
-                        // Navigate to notifications screen
-                      },
-                    ),
-                    IconButton(
-                      icon: Icon(Ionicons.paper_plane_outline, color: Colors.black),
-                      onPressed: () {
-                        // Navigate to messaging screen
-                      },
-                    ),
+                    // Icons can be added here
                   ],
                 ),
               ),
@@ -129,7 +152,54 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  Widget _buildYourStory(BuildContext context) {
+  Widget _buildStoriesSection() {
+    return SliverToBoxAdapter(
+      child: Container(
+        padding: EdgeInsets.symmetric(vertical: 10.0),
+        height: 120,
+        child: _isLoadingStories
+            ? Center(child: CircularProgressIndicator())
+            : ListView.builder(
+          scrollDirection: Axis.horizontal,
+          itemCount: _stories.length + 1,
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              return _buildYourStory();
+            }
+            final story = _stories[index - 1];
+            return _buildStoryAvatar(story);
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPostsSection() {
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+            (context, index) {
+          if (index >= _posts.length) {
+            return null;
+          }
+          final post = _posts[index];
+          return PostWidget(
+            post: post,
+            onLike: () {
+              setState(() {
+                post.toggleLike('currentUserId');
+              });
+            },
+            onComment: () {
+              // Handle comment action
+            },
+          );
+        },
+        childCount: _posts.length,
+      ),
+    );
+  }
+
+  Widget _buildYourStory() {
     return Container(
       width: 70,
       margin: EdgeInsets.symmetric(vertical: 10.0, horizontal: 5.0),
@@ -162,7 +232,8 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  Widget _buildStoryAvatar(Story story) {
+  Widget _buildStoryAvatar(Map<String, dynamic> story) {
+    final imageUrl = story['imageUrl'] ?? 'https://example.com/default_story_image.jpg';
     return Container(
       width: 70,
       margin: EdgeInsets.symmetric(vertical: 10.0, horizontal: 5.0),
@@ -170,12 +241,12 @@ class _FeedScreenState extends State<FeedScreen> {
         children: [
           CircleAvatar(
             radius: 30,
-            backgroundImage: AssetImage(story.imageUrl),
+            backgroundImage: NetworkImage(imageUrl),
           ),
           SizedBox(height: 5),
           Expanded(
             child: Text(
-              story.username,
+              story['username'] ?? 'Unknown',
               style: TextStyle(fontSize: 12),
               overflow: TextOverflow.ellipsis,
             ),

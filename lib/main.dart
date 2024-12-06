@@ -1,14 +1,22 @@
-import 'package:flickfeedpro/screens/splash_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flickfeedpro/screens/splash_screen.dart';
 import 'package:flickfeedpro/screens/home_screen.dart';
 import 'package:flickfeedpro/screens/feed_screen.dart';
 import 'package:flickfeedpro/login/login.dart';
-import 'package:flickfeedpro/login/loginviewmodel.dart';
 import 'package:flickfeedpro/register/registerpage.dart';
-import 'package:flickfeedpro/screens/splash_screen.dart';
+import 'package:flickfeedpro/login/loginviewmodel.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Supabase
+  await Supabase.initialize(
+    url: 'https://bvlmfeoikgsayrcelccq.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ2bG1mZW9pa2dzYXlyY2VsY2NxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzMxMjE4NDcsImV4cCI6MjA0ODY5Nzg0N30.VpHNOpfAa243g9PBHv-Gp5I7ynwvsggSLOPmvSiE9aw',
+  );
+
   runApp(
     ChangeNotifierProvider(
       create: (_) => LoginViewModel(),
@@ -26,7 +34,7 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      debugShowCheckedModeBanner: false,  // This line hides the debug banner
+      debugShowCheckedModeBanner: false,
       home: SplashScreen(),
       routes: {
         '/login': (context) => LoginPage(),

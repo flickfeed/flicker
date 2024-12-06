@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'userslistscreen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class UsersProfileScreen extends StatelessWidget {
   final String username;
@@ -10,7 +10,6 @@ class UsersProfileScreen extends StatelessWidget {
   final int followingCount;
   final String bio;
   final bool isFollowing;
-  final List<String> mutualFollowers; // Add this line
 
   UsersProfileScreen({
     required this.username,
@@ -21,114 +20,93 @@ class UsersProfileScreen extends StatelessWidget {
     required this.followingCount,
     required this.bio,
     required this.isFollowing,
-    required this.mutualFollowers, // Add this line
   });
+
+  // Function to follow or unfollow the user
+  Future<void> _followUnfollowUser(BuildContext context, String followedUserId, bool isFollowing) async {
+    String currentUserId = Supabase.instance.client.auth.currentUser!.id;
+
+    try {
+      if (isFollowing) {
+        // Unfollow logic
+        await Supabase.instance.client
+            .from('following')
+            .delete()
+            .eq('follower_id', currentUserId)
+            .eq('followed_id', followedUserId)
+            .execute();
+
+        await Supabase.instance.client
+            .from('followers')
+            .delete()
+            .eq('follower_id', currentUserId)
+            .eq('user_id', followedUserId)
+            .execute();
+      } else {
+        // Follow logic
+        await Supabase.instance.client
+            .from('following')
+            .insert({
+          'follower_id': currentUserId,
+          'followed_id': followedUserId,
+          'created_at': DateTime.now().toIso8601String(),
+        })
+            .execute();
+
+        await Supabase.instance.client
+            .from('followers')
+            .insert({
+          'follower_id': currentUserId,
+          'user_id': followedUserId,
+          'created_at': DateTime.now().toIso8601String(),
+        })
+            .execute();
+      }
+
+      // Display a message to indicate success
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isFollowing ? 'Unfollowed $username' : 'Followed $username'),
+        ),
+      );
+
+      // Refresh the state by closing and reopening the page
+      Navigator.pop(context);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(username),
-      ),
-      body: SingleChildScrollView(
+      appBar: AppBar(title: Text(username)),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            SizedBox(height: 20),
             CircleAvatar(
-              backgroundImage: AssetImage(avatarUrl),
               radius: 50,
+              backgroundImage: NetworkImage(avatarUrl),
             ),
-            SizedBox(height: 10),
-            Text(
-              username,
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 10),
-            Text(
-              name, // Display the name
-              style: TextStyle(fontSize: 18, color: Colors.grey),
-            ),
-            SizedBox(height: 5),
-            Text(
-              bio, // Display the bio
-              style: TextStyle(fontSize: 16, color: Colors.black),
-            ),
-            SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildCountColumn('Posts', postCount),
-                _buildCountColumn('Followers', followerCount, context, 'followers'),
-                _buildCountColumn('Following', followingCount, context, 'following'),
-              ],
-            ),
-            SizedBox(height: 20),
+            SizedBox(height: 16),
+            Text(name, style: TextStyle(fontSize: 24)),
+            SizedBox(height: 8),
+            Text(bio),
+            SizedBox(height: 16),
+            Text('Posts: $postCount  Followers: $followerCount  Following: $followingCount'),
+            SizedBox(height: 16),
             ElevatedButton(
-              onPressed: () {
-                // Handle follow/unfollow functionality
-              },
-              child: Text(isFollowing ? 'Following' : 'Follow'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isFollowing ? Colors.grey[300] : Theme.of(context).primaryColor, // Fixed the primary parameter issue
-              ),
-            ),
-            SizedBox(height: 20),
-            _buildPostsGrid(), // Display user posts grid
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCountColumn(String label, int count, [BuildContext? context, String? screenType]) {
-    return GestureDetector(
-      onTap: () {
-        if (context != null && screenType != null) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => UsersListScreen(
-                username: username,
-                screenType: screenType,
-              ),
-            ),
-          );
-        }
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: Column(
-          children: [
-            Text(
-              '$count',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            Text(
-              label,
-              style: TextStyle(fontSize: 16, color: Colors.grey),
+              onPressed: () => _followUnfollowUser(context, username, isFollowing),
+              child: Text(isFollowing ? 'Unfollow' : 'Follow'),
             ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildPostsGrid() {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: NeverScrollableScrollPhysics(),
-      itemCount: postCount,
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        crossAxisSpacing: 4.0,
-        mainAxisSpacing: 4.0,
-      ),
-      itemBuilder: (BuildContext context, int index) {
-        return Container(
-          color: Colors.grey[300], // Placeholder for post image
-        );
-      },
     );
   }
 }

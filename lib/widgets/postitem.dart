@@ -15,10 +15,22 @@ class PostItem extends StatefulWidget {
 class _PostItemState extends State<PostItem> {
   bool isLiked = false;
 
+  @override
+  void initState() {
+    super.initState();
+    // Replace 'currentUserId' with the actual user ID
+    isLiked = widget.post.likedUsers.contains('currentUserId'); // Check if the post is liked by the current user
+  }
+
   void _toggleLike() {
     setState(() {
       isLiked = !isLiked;
-      widget.post.toggleLike(isLiked);
+      if (isLiked) {
+        widget.post.likedUsers.add('currentUserId'); // Add user ID when liked
+      } else {
+        widget.post.likedUsers.remove('currentUserId'); // Remove user ID when unliked
+      }
+      widget.post.toggleLike('currentUserId'); // Pass actual user ID here
     });
   }
 
@@ -34,6 +46,25 @@ class _PostItemState extends State<PostItem> {
     // Implement share functionality
   }
 
+  String _timeAgo(DateTime postTime) {
+    final now = DateTime.now();
+    final difference = now.difference(postTime);
+
+    if (difference.inDays > 365) {
+      return '${(difference.inDays / 365).floor()} years ago';
+    } else if (difference.inDays > 30) {
+      return '${(difference.inDays / 30).floor()} months ago';
+    } else if (difference.inDays > 0) {
+      return '${difference.inDays} days ago';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours} hours ago';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes} minutes ago';
+    } else {
+      return 'Just now';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -43,15 +74,15 @@ class _PostItemState extends State<PostItem> {
         children: [
           ListTile(
             leading: CircleAvatar(
-              backgroundImage: AssetImage(widget.post.avatarUrl),
+              backgroundImage: NetworkImage(widget.post.avatarUrl),
             ),
             title: Text(widget.post.username),
-            subtitle: Text('2 hours ago'), // Update this to be dynamic if necessary
+            subtitle: Text(_timeAgo(widget.post.timestamp.toDate())),
           ),
           Container(
             height: 300,
             width: double.infinity,
-            child: Image.asset(widget.post.imageUrl, fit: BoxFit.cover),
+            child: Image.network(widget.post.imageUrl, fit: BoxFit.cover),
           ),
           Padding(
             padding: EdgeInsets.all(10.0),
