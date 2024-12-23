@@ -28,12 +28,45 @@ class LoginViewModel extends ChangeNotifier {
       setLoading(true);
 
       try {
+        // Attempt to log in with Supabase Auth
         final response = await Supabase.instance.client.auth.signInWithPassword(
           email: _email,
           password: _password,
         );
 
         if (response.session != null) {
+          // Fetch user details after successful login
+          final userId = response.user!.id;
+
+          // Query user details from 'userdetails' table, limiting to one row
+          final userDetailsResponse = await Supabase.instance.client
+              .from('userdetails')
+              .select()
+              .eq('id', userId)
+              .limit(1) // Ensure only one row is returned
+              .execute();
+
+          // If no user details are found, insert them into the 'userdetails' table
+          if (userDetailsResponse.data == null || userDetailsResponse.data.isEmpty) {
+            // Insert user details into the 'userdetails' table
+            final insertResponse = await Supabase.instance.client.from('userdetails').insert({
+              'id': userId,
+              'username': 'New User', // You can set a default or prompt for the username
+            }).execute();
+
+            // Check if there's any error in the response (via status or data)
+            if (insertResponse.status != 200) {
+              throw Exception('Failed to insert user details: ${insertResponse.status}');
+            }
+
+            print('User details inserted: $userId');
+          }
+
+          // Use the first item if found (since we limited the query to 1 row)
+          final userData = userDetailsResponse.data?.isNotEmpty == true ? userDetailsResponse.data![0] : null;
+          print('User Details: $userData'); // Debugging purpose
+
+          // Navigate to the home screen after successful login
           Navigator.pushReplacementNamed(context, '/home');
         } else {
           throw Exception('Failed to log in.');
@@ -51,6 +84,8 @@ class LoginViewModel extends ChangeNotifier {
       );
     }
   }
+
+
 
   void forgotPassword(BuildContext context) async {
     if (_email.isNotEmpty) {

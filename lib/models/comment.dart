@@ -76,8 +76,11 @@ class Comment {
       })
           .execute();
 
-      if (response.error != null) {
-        print('Failed to add comment: ${response.error?.message}');
+      // No error check; only check if data is returned
+      if (response.data != null) {
+        print('Comment added successfully');
+      } else {
+        print('Failed to add comment: ${response.status}');
       }
     } catch (e) {
       print('Failed to add comment: $e');
@@ -94,14 +97,14 @@ class Comment {
           .order('timestamp', ascending: false)
           .execute();
 
-      if (response.error != null) {
-        print('Failed to get comments: ${response.error?.message}');
+      // Directly check the response status
+      if (response.status == 200 && response.data != null) {
+        return List<Comment>.from(response.data
+            .map<Comment>((data) => Comment.fromMap(data)));
+      } else {
+        print('No comments found or failed to fetch comments');
         return [];
       }
-
-      return response.data
-          .map<Comment>((data) => Comment.fromMap(data))
-          .toList();
     } catch (e) {
       print('Failed to get comments: $e');
       return [];
@@ -109,7 +112,12 @@ class Comment {
   }
 
   // Future method to delete a comment from Supabase
-  Future<void> deleteComment(String commentId) async {
+  Future<void> deleteComment() async {
+    if (commentId == null) {
+      print('Comment ID is null');
+      return;
+    }
+
     try {
       final response = await Supabase.instance.client
           .from('comments')
@@ -117,8 +125,11 @@ class Comment {
           .eq('id', commentId)
           .execute();
 
-      if (response.error != null) {
-        print('Failed to delete comment: ${response.error?.message}');
+      // Directly check if the deletion was successful
+      if (response.status == 200) {
+        print('Comment deleted successfully');
+      } else {
+        print('Failed to delete comment: ${response.status}');
       }
     } catch (e) {
       print('Failed to delete comment: $e');
@@ -141,8 +152,11 @@ class Comment {
           .eq('id', commentId)
           .execute();
 
-      if (response.error != null) {
-        print('Failed to toggle like: ${response.error?.message}');
+      // Check if like update was successful based on status
+      if (response.status == 200) {
+        print('Comment like status updated successfully');
+      } else {
+        print('Failed to toggle like: ${response.status}');
       }
     } catch (e) {
       print('Failed to toggle like: $e');

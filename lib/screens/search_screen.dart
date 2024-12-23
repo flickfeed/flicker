@@ -42,13 +42,17 @@ class _SearchScreenState extends State<SearchScreen> {
           .ilike('username', '%$query%') // Perform case-insensitive search
           .execute();
 
-      if (response.error != null) {
-        throw Exception(response.error!.message);
+      // Check if the data is returned, and update UI
+      if (response.data != null) {
+        setState(() {
+          _filteredUsers = List<Map<String, dynamic>>.from(response.data);
+        });
+      } else {
+        // If no data is returned, show a message
+        setState(() {
+          _filteredUsers.clear();
+        });
       }
-
-      setState(() {
-        _filteredUsers = List<Map<String, dynamic>>.from(response.data ?? []);
-      });
     } catch (e) {
       print("Error fetching users: $e");
       ScaffoldMessenger.of(context).showSnackBar(

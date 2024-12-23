@@ -2,17 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/services.dart'; // For Clipboard and ClipboardData
 
 class SharePostScreen extends StatefulWidget {
   final String postId; // Post's unique ID
   final String imageUrl; // URL of the post's image
   final String caption; // Post's caption
 
-  SharePostScreen({
+  const SharePostScreen({
+    Key? key,
     required this.postId,
     required this.imageUrl,
     required this.caption,
-  });
+  }) : super(key: key);
 
   @override
   _SharePostScreenState createState() => _SharePostScreenState();
@@ -33,7 +35,6 @@ class _SharePostScreenState extends State<SharePostScreen> {
     _fetchFollowersData();
   }
 
-  /// Fetch the current user's followers from Supabase
   Future<void> _fetchFollowersData() async {
     setState(() {
       isLoading = true;
@@ -53,7 +54,7 @@ class _SharePostScreenState extends State<SharePostScreen> {
 
         setState(() {
           followers = List<Map<String, dynamic>>.from(response.data ?? []);
-          searchResults = followers; // Default results show all followers
+          searchResults = followers;
         });
       }
     } catch (e) {
@@ -67,23 +68,19 @@ class _SharePostScreenState extends State<SharePostScreen> {
     }
   }
 
-  /// Perform search among followers
   void _searchFollowers(String query) {
     setState(() {
       searchQuery = query;
-      if (query.isEmpty) {
-        searchResults = followers;
-      } else {
-        searchResults = followers
-            .where((follower) => follower['follower_username']
-            .toLowerCase()
-            .contains(query.toLowerCase()))
-            .toList();
-      }
+      searchResults = query.isEmpty
+          ? followers
+          : followers
+          .where((follower) => follower['follower_username']
+          .toLowerCase()
+          .contains(query.toLowerCase()))
+          .toList();
     });
   }
 
-  /// Copy the post link to clipboard
   void _copyLink() {
     Clipboard.setData(ClipboardData(text: widget.imageUrl));
     ScaffoldMessenger.of(context).showSnackBar(
@@ -91,28 +88,20 @@ class _SharePostScreenState extends State<SharePostScreen> {
     );
   }
 
-  /// Share the post via other apps
   void _shareTo() {
-    Share.share(
-      'Check out this post: ${widget.caption}\n${widget.imageUrl}',
-    );
+    Share.share('Check out this post: ${widget.caption}\n${widget.imageUrl}');
   }
 
-  /// Share the post via WhatsApp
   void _shareToWhatsApp() {
-    Share.share(
-      'Check out this post on WhatsApp: ${widget.caption}\n${widget.imageUrl}',
-    );
+    Share.share('Check out this post on WhatsApp: ${widget.caption}\n${widget.imageUrl}');
   }
 
-  /// Simulate adding the post to the user's story
   void _addToStory() {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Post added to story')),
     );
   }
 
-  /// Handle follower selection
   void _onFollowerTap(String username) {
     setState(() {
       if (selectedFollowers.contains(username)) {
@@ -128,9 +117,9 @@ class _SharePostScreenState extends State<SharePostScreen> {
     return GestureDetector(
       onTap: () => Navigator.of(context).pop(),
       child: Material(
-        color: Colors.black.withOpacity(0.4), // Semi-transparent background
+        color: Colors.black.withOpacity(0.4),
         child: GestureDetector(
-          onTap: () {}, // Prevent tap propagation
+          onTap: () {},
           child: DraggableScrollableSheet(
             initialChildSize: 0.5,
             minChildSize: 0.3,
@@ -165,7 +154,7 @@ class _SharePostScreenState extends State<SharePostScreen> {
                       child: GridView.builder(
                         padding: const EdgeInsets.all(8.0),
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 3, // Display 3 profiles per row
+                          crossAxisCount: 3,
                           childAspectRatio: 0.75,
                         ),
                         itemCount: searchResults.length,
@@ -174,8 +163,7 @@ class _SharePostScreenState extends State<SharePostScreen> {
                           return Column(
                             children: [
                               GestureDetector(
-                                onTap: () =>
-                                    _onFollowerTap(follower['follower_username']),
+                                onTap: () => _onFollowerTap(follower['follower_username']),
                                 child: Stack(
                                   children: [
                                     CircleAvatar(
@@ -191,8 +179,7 @@ class _SharePostScreenState extends State<SharePostScreen> {
                                         child: CircleAvatar(
                                           radius: 12,
                                           backgroundColor: Colors.blue,
-                                          child: Icon(Icons.check,
-                                              size: 16, color: Colors.white),
+                                          child: Icon(Icons.check, size: 16, color: Colors.white),
                                         ),
                                       ),
                                   ],
@@ -201,8 +188,7 @@ class _SharePostScreenState extends State<SharePostScreen> {
                               SizedBox(height: 4),
                               Text(
                                 follower['follower_username'],
-                                style: TextStyle(
-                                    fontSize: 12, color: Colors.black),
+                                style: TextStyle(fontSize: 12, color: Colors.black),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ],
@@ -210,31 +196,32 @@ class _SharePostScreenState extends State<SharePostScreen> {
                         },
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        borderRadius:
-                        BorderRadius.vertical(bottom: Radius.circular(20)),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _buildIconOption(Icons.copy, 'Copy link', _copyLink),
-                          _buildIconOption(Icons.send, 'Share to...', _shareTo),
-                          _buildIconOption(
-                              FontAwesomeIcons.whatsapp, 'WhatsApp', _shareToWhatsApp),
-                          _buildIconOption(
-                              Icons.add_circle_outline, 'Add to story', _addToStory),
-                        ],
-                      ),
-                    ),
+                    _buildBottomOptions(),
                   ],
                 ),
               );
             },
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildBottomOptions() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.grey[200],
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _buildIconOption(Icons.copy, 'Copy link', _copyLink),
+          _buildIconOption(Icons.send, 'Share to...', _shareTo),
+          _buildIconOption(FontAwesomeIcons.whatsapp, 'WhatsApp', _shareToWhatsApp),
+          _buildIconOption(Icons.add_circle_outline, 'Add to story', _addToStory),
+        ],
       ),
     );
   }

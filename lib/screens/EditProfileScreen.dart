@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
-import 'package:supabase_flutter/supabase_flutter.dart'; // Import Supabase
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class EditProfileScreen extends StatefulWidget {
   final String name;
@@ -32,7 +32,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final ImagePicker _picker = ImagePicker();
   File? _imageFile;
 
-  final supabase = Supabase.instance.client; // Supabase instance
+  final supabase = Supabase.instance.client;
 
   @override
   void initState() {
@@ -57,42 +57,54 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
       String imageUrl = _imageUrl;
+
+      // Upload image if a new one is selected
       if (_imageFile != null) {
-        imageUrl = await _uploadImage(_imageFile!);
+        try {
+          imageUrl = await _uploadImage(_imageFile!);
+        } catch (e) {
+          print('Error uploading image: $e');
+          return; // Exit the method if the image upload fails
+        }
       }
 
-      // Save updated data to Supabase (assuming you have a table 'userdetails')
-      final response = await supabase.from('userdetails').upsert({
-        'user_id': supabase.auth.currentUser!.id, // Use current user ID
-        'name': _name,
-        'username': _username,
-        'website': _website,
-        'bio': _bio,
-        'imageUrl': imageUrl,
-      }).execute();
+      try {
+        // Update user details in Supabase
+        await supabase.from('userdetails').upsert({
+          'user_id': supabase.auth.currentUser!.id, // Match schema for `userdetails`
+          'name': _name,
+          'username': _username,
+          'website': _website,
+          'bio': _bio,
+          'imageUrl': imageUrl,
+        });
 
-      if (response.error != null) {
-        print('Error updating profile: ${response.error?.message}');
-        return;
+        Navigator.pop(context, {
+          'name': _name,
+          'username': _username,
+          'website': _website,
+          'bio': _bio,
+          'imageUrl': imageUrl,
+        });
+      } catch (e) {
+        print('Error updating profile: $e');
       }
-
-      Navigator.pop(context, {
-        'name': _name,
-        'username': _username,
-        'website': _website,
-        'bio': _bio,
-        'imageUrl': imageUrl,
-      });
     }
   }
 
   Future<String> _uploadImage(File imageFile) async {
-    // Upload the image to Supabase storage
-    final fileName = 'profile_images/${DateTime.now().toIso8601String()}.jpg';
-    final storageRef = supabase.storage.from('profile_images').upload(fileName, imageFile);
-    final fileUrl = await storageRef;
+    try {
+      final fileName = 'profile_images/${DateTime.now().toIso8601String()}.jpg';
+      final fileBytes = await imageFile.readAsBytes(); // Convert File to bytes
+      await supabase.storage.from('profile_images').uploadBinary(fileName, fileBytes);
 
-    return fileUrl;
+      // Get the public URL of the uploaded file
+      final publicUrl = supabase.storage.from('profile_images').getPublicUrl(fileName);
+      return publicUrl;
+    } catch (e) {
+      print('Error uploading image: $e');
+      throw Exception('Image upload failed');
+    }
   }
 
   @override

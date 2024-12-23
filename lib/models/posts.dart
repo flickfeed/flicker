@@ -12,7 +12,7 @@ class Post {
   bool isHidden;
   List<String> likedUsers;
   final DateTime timestamp;
-  String? postId; // Optional postId field to identify posts
+  String? postId;
 
   Post({
     required this.username,
@@ -28,12 +28,12 @@ class Post {
     this.postId,
   });
 
-  // Factory constructor to create a Post instance from Supabase data
+  // Factory constructor for Supabase data
   factory Post.fromMap(Map<String, dynamic> map) {
     return Post(
       username: map['username'] ?? '',
       avatarUrl: map['avatar_url'] ?? '',
-      imageUrl: map['image_url'] ?? '',
+      imageUrl: map['image_url'] ?? '',  // No URL logic here
       caption: map['caption'] ?? '',
       likes: map['likes'] ?? 0,
       comments: (map['comments'] as List<dynamic>? ?? [])
@@ -43,11 +43,11 @@ class Post {
       isHidden: map['is_hidden'] ?? false,
       likedUsers: List<String>.from(map['liked_users'] ?? []),
       timestamp: DateTime.parse(map['timestamp']),
-      postId: map['id'], // Assign the ID from the Supabase record
+      postId: map['id'],
     );
   }
 
-  // Converts Post instance to a Map to be stored in Supabase
+  // Converts Post to a Map
   Map<String, dynamic> toMap() {
     return {
       'username': username,
@@ -63,7 +63,7 @@ class Post {
     };
   }
 
-  // Method to toggle like/unlike functionality for the current user in Supabase
+  // Like/unlike functionality
   Future<void> toggleLike(String userId) async {
     try {
       if (likedUsers.contains(userId)) {
@@ -74,26 +74,27 @@ class Post {
         likes++;
       }
 
-      // Update the post data in Supabase
+      // Update the post in Supabase
       final response = await Supabase.instance.client
           .from('posts')
-          .upsert({
-        'id': postId, // Update the post using its ID
+          .update({
         'likes': likes,
         'liked_users': likedUsers,
       })
           .eq('id', postId)
           .execute();
 
-      if (response.error != null) {
-        print('Error toggling like: ${response.error?.message}');
+      if (response.status == 200) {
+        print('Like toggled successfully');
+      } else {
+        print('Failed to toggle like: ${response.status}');
       }
     } catch (e) {
       print('Error toggling like: $e');
     }
   }
 
-  // Adds a new post to Supabase using the toMap method
+  // Adds a new post to Supabase
   Future<void> addPost() async {
     try {
       final response = await Supabase.instance.client
@@ -101,10 +102,11 @@ class Post {
           .insert([toMap()])
           .execute();
 
-      if (response.error == null) {
-        postId = response.data[0]['id']; // Set postId to the new record's ID
+      if (response.status == 200 && response.data != null) {
+        postId = response.data[0]['id']; // Assign the new post's ID
+        print('Post added successfully');
       } else {
-        print('Error adding post: ${response.error?.message}');
+        print('Failed to add post: ${response.status}');
       }
     } catch (e) {
       print('Failed to add post: $e');

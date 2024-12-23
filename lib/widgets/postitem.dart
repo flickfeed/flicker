@@ -77,7 +77,7 @@ class _PostItemState extends State<PostItem> {
               backgroundImage: NetworkImage(widget.post.avatarUrl),
             ),
             title: Text(widget.post.username),
-            subtitle: Text(_timeAgo(widget.post.timestamp.toDate())),
+            subtitle: Text(_timeAgo(widget.post.timestamp))
           ),
           Container(
             height: 300,

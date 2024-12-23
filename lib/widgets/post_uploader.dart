@@ -13,49 +13,66 @@ class PostUploader {
 
   Future<void> createPost(String caption) async {
     try {
+      // Check if the user is authenticated
+      final user = _supabase.auth.currentUser;
+      if (user == null) {
+        print('User is not authenticated');
+        return;
+      }
+
       // Pick an image from the gallery
       final picker = ImagePicker();
       final pickedImage = await picker.pickImage(source: ImageSource.gallery);
+      if (pickedImage == null) {
+        print('No image selected');
+        return;
+      }
 
-      if (pickedImage != null) {
-        final imageFile = File(pickedImage.path);
+      final imageFile = File(pickedImage.path);
 
+      // Generate a unique file name for the uploaded image
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final filePath = 'posts/$fileName';  // Updated path to 'posts'
+
+      // Reference the correct bucket in Supabase storage
+      final storageRef = _supabase.storage.from('images'); // Ensure the bucket is named 'images'
+
+      try {
         // Upload image to Supabase storage
-        final fileName = DateTime.now().toString();
-        final storageRef = _supabase.storage.from('post_images');
-        final filePath = 'postImages/$fileName';
         final uploadResponse = await storageRef.upload(filePath, imageFile);
+        print('File uploaded successfully');
 
-        if (uploadResponse.error != null) {
-          print('Failed to upload image: ${uploadResponse.error?.message}');
-          return;
-        }
-
-        // Get the URL of the uploaded image
-        final imageUrl = await storageRef.getPublicUrl(filePath);
+        // Get the public URL of the uploaded image
+        final imageUrl = storageRef.getPublicUrl(filePath);
+        print('Image public URL: $imageUrl');
 
         // Insert post data into Supabase database
         final postResponse = await _supabase
             .from('posts')
             .insert({
-          'user_id': userId,
+          'user_id': user.id,
           'username': username,
           'avatar_url': avatarUrl,
-          'image_url': imageUrl,
+          'image_url': imageUrl,  // Store the image URL in the database
           'caption': caption,
           'timestamp': DateTime.now().toIso8601String(),
           'likes': 0,
           'liked_users': [],
           'comments': [],
         })
-            .execute();
+            .select();
 
-        if (postResponse.error != null) {
-          print('Failed to create post: ${postResponse.error?.message}');
+        // Check for successful insertion
+        if (postResponse is List && postResponse.isNotEmpty) {
+          print('Post created successfully!');
+        } else {
+          print('Failed to create post. Response: $postResponse');
         }
+      } catch (error) {
+        print('Upload Error: $error');
       }
     } catch (e) {
       print('Failed to create post: $e');
     }
   }
-}
+  }

@@ -29,22 +29,18 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     _fetchProfileData();
   }
 
-  // Fetch user profile data from Supabase
   Future<void> _fetchProfileData() async {
     try {
       final user = supabase.auth.currentUser;
       if (user != null) {
         final response = await supabase
-            .from('users') // Assuming your users are stored in a table named 'users'
+            .from('users') // Replace with your actual users table name
             .select()
             .eq('id', user.id)
-            .single()
-            .execute();
+            .single();
 
-        if (response.error != null) {
-          print('Error fetching profile: ${response.error!.message}');
-        } else {
-          final userData = response.data as Map<String, dynamic>;
+        if (response != null) {
+          final userData = response as Map<String, dynamic>;
           setState(() {
             profileName = userData['profile_name'] ?? 'No Name';
             username = userData['username'] ?? 'username';
@@ -56,18 +52,17 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             followingCount = userData['following_count'] ?? 0;
             isLoading = false;
           });
+        } else {
+          print('Error fetching profile: No response data');
+          setState(() => isLoading = false);
         }
       } else {
-        setState(() {
-          isLoading = false;
-        });
-        print('No user is logged in');
+        print('No user is logged in.');
+        setState(() => isLoading = false);
       }
     } catch (e) {
-      setState(() {
-        isLoading = false;
-      });
       print('Error fetching profile data: $e');
+      setState(() => isLoading = false);
     }
   }
 
@@ -119,34 +114,20 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                           : AssetImage('assets/images/default_avatar.png') as ImageProvider,
                     ),
                     SizedBox(width: 16),
-                    Column(
-                      children: [
-                        Text(postsCount.toString()),
-                        Text('Posts'),
-                      ],
-                    ),
-                    SizedBox(width: 16),
-                    Column(
-                      children: [
-                        Text(followersCount.toString()),
-                        Text('Followers'),
-                      ],
-                    ),
-                    SizedBox(width: 16),
-                    Column(
-                      children: [
-                        Text(followingCount.toString()),
-                        Text('Following'),
-                      ],
-                    ),
+                    _buildProfileStats('Posts', postsCount),
+                    _buildProfileStats('Followers', followersCount),
+                    _buildProfileStats('Following', followingCount),
                   ],
                 ),
                 SizedBox(height: 10),
                 Text(profileName, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                 SizedBox(height: 5),
-                Text(bio),
-                SizedBox(height: 5),
-                Text(website, style: TextStyle(color: Colors.blue)),
+                if (bio.isNotEmpty) Text(bio),
+                if (website.isNotEmpty)
+                  Text(
+                    website,
+                    style: TextStyle(color: Colors.blue),
+                  ),
                 SizedBox(height: 10),
                 ElevatedButton(
                   onPressed: () => _navigateToEditProfile(context),
@@ -178,23 +159,33 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     );
   }
 
-  // Fetch user's posts in grid layout
+  Widget _buildProfileStats(String label, int count) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            count.toString(),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          Text(label),
+        ],
+      ),
+    );
+  }
+
   Widget _buildGridPosts() {
     final userId = supabase.auth.currentUser?.id ?? '';
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: supabase
-          .from('posts') // Assuming posts are stored in 'posts' table
-          .select()
-          .eq('user_id', userId)
-          .order('created_at', ascending: false)
-          .stream(),
+          .from('posts')
+          .stream(primaryKey: ['id'])
+          .eq('user_id', userId),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return Center(child: CircularProgressIndicator());
         }
 
         final posts = snapshot.data!;
-
         return GridView.builder(
           itemCount: posts.length,
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -212,23 +203,19 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     );
   }
 
-  // Fetch user's posts in list layout
   Widget _buildListPosts() {
     final userId = supabase.auth.currentUser?.id ?? '';
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: supabase
           .from('posts')
-          .select()
-          .eq('user_id', userId)
-          .order('created_at', ascending: false)
-          .stream(),
+          .stream(primaryKey: ['id'])
+          .eq('user_id', userId),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return Center(child: CircularProgressIndicator());
         }
 
         final posts = snapshot.data!;
-
         return ListView.builder(
           itemCount: posts.length,
           itemBuilder: (context, index) {
@@ -236,10 +223,13 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             final imageUrl = post['image_url'] ?? 'https://example.com/default_image.jpg';
             final caption = post['caption'] ?? '';
             return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Image.network(imageUrl, fit: BoxFit.cover),
-                SizedBox(height: 8),
-                Text(caption),
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Text(caption),
+                ),
               ],
             );
           },

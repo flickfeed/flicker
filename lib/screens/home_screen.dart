@@ -104,16 +104,17 @@ class _HomeScreenState extends State<HomeScreen> {
       final fileName = path.basename(imageFile.path);
       final byteData = await imageFile.readAsBytes();
 
-      final storageResponse = await Supabase.instance.client.storage
-          .from('posts')
+      final filePath = await Supabase.instance.client.storage
+          .from('images')
           .uploadBinary('posts/$fileName', byteData);
 
-      if (storageResponse.error != null) {
-        throw Exception('Failed to upload image: ${storageResponse.error!.message}');
+      // Check if filePath is valid (not null or empty)
+      if (filePath == null || filePath.isEmpty) {
+        throw Exception('Failed to upload image: No file path returned.');
       }
 
       final imageUrl = Supabase.instance.client.storage
-          .from('posts')
+          .from('images')
           .getPublicUrl('posts/$fileName');
 
       await _createPost(imageUrl, caption, location);
@@ -134,7 +135,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final post = {
         'username': userDetails['username'],
         'avatar_url': userDetails['avatar_url'] ?? 'defaultAvatarUrl',
-        'image_url': imageUrl,
+        'image_url': imageUrl, // Store the public URL here
         'caption': caption,
         'likes': 0,
         'comments': [],
@@ -146,19 +147,29 @@ class _HomeScreenState extends State<HomeScreen> {
 
       final response = await Supabase.instance.client
           .from('posts')
-          .insert(post);
+          .insert(post)
+          .execute();
 
-      if (response.error != null) {
-        throw Exception('Failed to create post: ${response.error!.message}');
+      // Check the status code
+      if (response.status != 200) {
+        // Check the response data for error information
+        print('Failed to create post: ${response.status} - ${response.data}');
+        throw Exception('Failed to create post: ${response.status}');
       }
 
+      // Success case
+      print('Post created successfully');
       setState(() {
         _selectedImage = null; // Reset the image after posting
       });
     } catch (e) {
-      print('Failed to create post: $e');
+      print('Error: $e');
     }
   }
+
+
+
+
 
   void _showNewPostModal() {
     showModalBottomSheet(
@@ -235,3 +246,4 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
+

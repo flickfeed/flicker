@@ -23,13 +23,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           .from('notifications') // Replace with your notifications table in Supabase
           .select()
           .eq('user_id', userId)
-          .order('timestamp', ascending: false)
-          .execute();
+          .order('timestamp', ascending: false);
 
-      if (response.error == null) {
-        return List<Map<String, dynamic>>.from(response.data);
+      if (response != null) {
+        return List<Map<String, dynamic>>.from(response as List);
       } else {
-        print('Failed to fetch notifications: ${response.error?.message}');
+        print('Failed to fetch notifications: Response is null.');
         return [];
       }
     } catch (e) {
@@ -62,7 +61,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               final notification = notifications[index];
               return ListTile(
                 leading: CircleAvatar(
-                  backgroundImage: NetworkImage(notification['profilePicUrl']),
+                  backgroundImage: NetworkImage(notification['profilePicUrl'] ?? ''),
                 ),
                 title: _buildNotificationText(notification),
                 subtitle: Text(_formatTime(notification['timestamp'])),
@@ -82,7 +81,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           text: TextSpan(
             children: [
               TextSpan(
-                text: notification['username'],
+                text: notification['username'] ?? 'Unknown',
                 style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
               ),
               TextSpan(
@@ -100,15 +99,20 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   // Format timestamp
   String _formatTime(String timestamp) {
-    DateTime dateTime = DateTime.parse(timestamp);
-    Duration difference = DateTime.now().difference(dateTime);
+    try {
+      DateTime dateTime = DateTime.parse(timestamp);
+      Duration difference = DateTime.now().difference(dateTime);
 
-    if (difference.inMinutes < 60) {
-      return '${difference.inMinutes}m';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours}h';
-    } else {
-      return '${difference.inDays}d';
+      if (difference.inMinutes < 60) {
+        return '${difference.inMinutes}m';
+      } else if (difference.inHours < 24) {
+        return '${difference.inHours}h';
+      } else {
+        return '${difference.inDays}d';
+      }
+    } catch (e) {
+      print('Error formatting time: $e');
+      return 'Unknown time';
     }
   }
 

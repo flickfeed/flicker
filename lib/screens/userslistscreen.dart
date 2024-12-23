@@ -39,22 +39,22 @@ class _SearchScreenState extends State<SearchScreen> {
           .like('username', '$query%')
           .execute();
 
-      if (response.error != null) {
-        print("Error fetching users: ${response.error!.message}");
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error fetching users")),
-        );
+      // Handle data without using .error
+      if (response.data != null) {
         setState(() {
-          _isLoading = false;
+          _filteredUsers = List<Map<String, dynamic>>.from(response.data);
         });
-        return;
+      } else {
+        setState(() {
+          _filteredUsers.clear();
+        });
       }
-
-      setState(() {
-        _filteredUsers = List<Map<String, dynamic>>.from(response.data);
-      });
     } catch (e) {
       print("Error fetching users: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error fetching users")),
+      );
+    } finally {
       setState(() {
         _isLoading = false;
       });
@@ -72,7 +72,7 @@ class _SearchScreenState extends State<SearchScreen> {
         .single()
         .execute();
 
-    return response.error == null && response.data != null;
+    return response.data != null;
   }
 
   @override
@@ -114,7 +114,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 return Center(child: CircularProgressIndicator());
               }
               if (!snapshot.hasData) {
-                return SizedBox.shrink(); // Handle error
+                return SizedBox.shrink(); // Handle error or empty state
               }
 
               bool isFollowing = snapshot.data!;

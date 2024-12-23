@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:ionicons/ionicons.dart';
-import 'home_screen.dart';
+import 'feed_screen.dart';
 import 'search_screen.dart';
 import 'activity_screen.dart';
 import 'profile_screen.dart';
-import 'feed_screen.dart';
-import 'package:flickfeedpro/screens/sharepostscreen.dart';
+import 'sharepostscreen.dart';
 
 class MainScreen extends StatefulWidget {
   @override
@@ -15,11 +14,11 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
 
-  late final List<Widget> _screens = [
-    FeedScreen(), // Provide required parameters if needed
+  final List<Widget> _screens = [
+    FeedScreen(),
     SearchScreen(),
     ActivityScreen(),
-    ProfileScreen(), // Replace with actual userId
+    ProfileScreen(),
   ];
 
   void _onTabTapped(int index) {
@@ -30,7 +29,7 @@ class _MainScreenState extends State<MainScreen> {
 
   void _handleNewPost() {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => SharePostScreen()),
+      MaterialPageRoute(builder: (context) => SharePostScreen(postId: '', imageUrl: '', caption: '',)),
     );
   }
 

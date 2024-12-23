@@ -54,17 +54,12 @@ class _FeedScreenState extends State<FeedScreen> {
       final response = await Supabase.instance.client
           .from('stories')
           .select('*')
-          .order('timestamp', ascending: false)
-          .execute();
+          .order('timestamp', ascending: false);
 
-      if (response.error == null) {
-        setState(() {
-          _stories = List<Map<String, dynamic>>.from(response.data);
-          _isLoadingStories = false;
-        });
-      } else {
-        throw response.error!;
-      }
+      setState(() {
+        _stories = List<Map<String, dynamic>>.from(response);
+        _isLoadingStories = false;
+      });
     } catch (e) {
       print('Error fetching stories: $e');
       setState(() {
@@ -73,24 +68,20 @@ class _FeedScreenState extends State<FeedScreen> {
     }
   }
 
+
   Future<void> _fetchPosts() async {
     try {
       final response = await Supabase.instance.client
           .from('posts')
           .select('*')
-          .order('timestamp', ascending: false)
-          .execute();
+          .order('timestamp', ascending: false);
 
-      if (response.error == null) {
-        setState(() {
-          _posts = (response.data as List<dynamic>)
-              .map((post) => Post.fromMap(post as Map<String, dynamic>))
-              .toList();
-          _isLoadingPosts = false;
-        });
-      } else {
-        throw response.error!;
-      }
+      setState(() {
+        _posts = (response as List<dynamic>)
+            .map((post) => Post.fromMap(post as Map<String, dynamic>))
+            .toList();
+        _isLoadingPosts = false;
+      });
     } catch (e) {
       print('Error fetching posts: $e');
       setState(() {
@@ -98,6 +89,7 @@ class _FeedScreenState extends State<FeedScreen> {
       });
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
