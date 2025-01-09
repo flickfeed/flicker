@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'comment.dart';
 
 class Post {
+  final String userId;
   final String username;
   final String avatarUrl;
   final String imageUrl;
@@ -12,9 +13,10 @@ class Post {
   bool isHidden;
   List<String> likedUsers;
   final DateTime timestamp;
-  String? postId;
+  int? postId;
 
   Post({
+    required this.userId,
     required this.username,
     required this.avatarUrl,
     required this.imageUrl,
@@ -31,6 +33,7 @@ class Post {
   // Factory constructor for Supabase data
   factory Post.fromMap(Map<String, dynamic> map) {
     return Post(
+      userId: map['user_id'],
       username: map['username'] ?? '',
       avatarUrl: map['avatar_url'] ?? '',
       imageUrl: map['image_url'] ?? '',  // No URL logic here
@@ -50,6 +53,7 @@ class Post {
   // Converts Post to a Map
   Map<String, dynamic> toMap() {
     return {
+      'user_id': userId,
       'username': username,
       'avatar_url': avatarUrl,
       'image_url': imageUrl,
@@ -60,6 +64,7 @@ class Post {
       'is_hidden': isHidden,
       'liked_users': likedUsers,
       'timestamp': timestamp.toIso8601String(),
+      'id': postId,
     };
   }
 
@@ -99,17 +104,22 @@ class Post {
     try {
       final response = await Supabase.instance.client
           .from('posts')
-          .insert([toMap()])
-          .execute();
+          .insert(toMap())
+          .select()
+          .single();
 
-      if (response.status == 200 && response.data != null) {
-        postId = response.data[0]['id']; // Assign the new post's ID
-        print('Post added successfully');
-      } else {
-        print('Failed to add post: ${response.status}');
+      if (response != null) {
+        postId = response['id'];
+        print('Post added successfully with ID: $postId');
       }
     } catch (e) {
       print('Failed to add post: $e');
+      rethrow; // This will help with debugging
     }
+  }
+
+  @override
+  String toString() {
+    return 'Post{id: $postId, userId: $userId, username: $username, caption: $caption, imageUrl: $imageUrl}';
   }
 }

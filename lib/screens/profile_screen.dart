@@ -107,12 +107,12 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
               children: [
                 Row(
                   children: [
-                    CircleAvatar(
-                      radius: 50,
-                      backgroundImage: profileImageUrl.isNotEmpty
-                          ? NetworkImage(profileImageUrl)
-                          : AssetImage('assets/images/default_avatar.png') as ImageProvider,
-                    ),
+                    // CircleAvatar(
+                    //   radius: 50,
+                    //   backgroundImage: profileImageUrl.isNotEmpty
+                    //       ? NetworkImage(profileImageUrl)
+                    //       // : AssetImage('assets/images/default_avatar.png') as ImageProvider,
+                    // ),
                     SizedBox(width: 16),
                     _buildProfileStats('Posts', postsCount),
                     _buildProfileStats('Followers', followersCount),

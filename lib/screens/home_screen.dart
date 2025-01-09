@@ -28,21 +28,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<Map<String, dynamic>?> _getUserDetails(String userId) async {
-    final response = await Supabase.instance.client
-        .from('userdetails')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-    if (response.error != null) {
-      print('Error fetching user details: ${response.error!.message}');
-      return null;
-    }
-
-    return response.data;
-  }
-
   Future<void> _selectImage(ImageSource source) async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: source);
@@ -108,7 +93,6 @@ class _HomeScreenState extends State<HomeScreen> {
           .from('images')
           .uploadBinary('posts/$fileName', byteData);
 
-      // Check if filePath is valid (not null or empty)
       if (filePath == null || filePath.isEmpty) {
         throw Exception('Failed to upload image: No file path returned.');
       }
@@ -126,49 +110,39 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _createPost(String imageUrl, String caption, String location) async {
     try {
       final userId = Supabase.instance.client.auth.currentUser?.id ?? 'defaultUserId';
-      final userDetails = await _getUserDetails(userId);
 
-      if (userDetails == null) {
-        throw Exception('User details not found.');
+      // Fetch username from the 'users' table using the 'userId'
+      final userResponse = await Supabase.instance.client
+          .from('users') // Assuming your users table is named 'users'
+          .select('username')
+          .eq('id', userId)
+          .single();
+
+      final username = userResponse['username'];
+
+      if (username == null) {
+        throw Exception('Username not found for the current user');
       }
-
-      final post = {
-        'username': userDetails['username'],
-        'avatar_url': userDetails['avatar_url'] ?? 'defaultAvatarUrl',
-        'image_url': imageUrl, // Store the public URL here
-        'caption': caption,
-        'likes': 0,
-        'comments': [],
-        'location': location,
-        'is_hidden': false,
-        'liked_users': [],
-        'timestamp': DateTime.now().toIso8601String(),
-      };
 
       final response = await Supabase.instance.client
           .from('posts')
-          .insert(post)
-          .execute();
+          .insert({
+        'user_id': userId,
+        'username': username,  // Insert the username
+        'image_url': imageUrl,
+        'caption': caption,
+        'location': location,
+        'timestamp': DateTime.now().toIso8601String(),
+      });
 
-      // Check the status code
-      if (response.status != 200) {
-        // Check the response data for error information
-        print('Failed to create post: ${response.status} - ${response.data}');
-        throw Exception('Failed to create post: ${response.status}');
-      }
-
-      // Success case
       print('Post created successfully');
       setState(() {
-        _selectedImage = null; // Reset the image after posting
+        _selectedImage = null;
       });
     } catch (e) {
       print('Error: $e');
     }
   }
-
-
-
 
 
   void _showNewPostModal() {
@@ -199,16 +173,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final userId = Supabase.instance.client.auth.currentUser?.id ?? 'defaultUserId';
-
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
         children: [
           FeedScreen(),
           SearchScreen(),
-          Container(), // Placeholder for the New Post screen
-          NotificationsScreen(), // Add NotificationsScreen here
+          Container(),
+          NotificationsScreen(),
           ProfileScreen(),
         ],
       ),
@@ -232,7 +204,7 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Post',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Ionicons.notifications_outline),  // Notification icon
+            icon: Icon(Ionicons.notifications_outline),
             activeIcon: Icon(Ionicons.notifications),
             label: 'Notifications',
           ),
@@ -246,4 +218,3 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
-

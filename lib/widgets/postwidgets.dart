@@ -25,6 +25,8 @@ class PostWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+    
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 15.0),
       child: Column(
@@ -53,12 +55,6 @@ class PostWidget extends StatelessWidget {
                   ),
                 );
               },
-              errorBuilder: (context, error, stackTrace) {
-                return Image.asset(
-                  'assets/images/placeholder.png',
-                  fit: BoxFit.cover,
-                ); // Placeholder image
-              },
             ),
           ),
           Padding(
@@ -67,10 +63,10 @@ class PostWidget extends StatelessWidget {
               children: [
                 IconButton(
                   icon: Icon(
-                    post.likedUsers.contains('currentUserId') // Replace with actual user ID
+                    post.likedUsers.contains(currentUserId) // Use actual user ID
                         ? Icons.favorite
                         : Icons.favorite_border,
-                    color: post.likedUsers.contains('currentUserId') ? Colors.red : null,
+                    color: post.likedUsers.contains(currentUserId) ? Colors.red : null,
                   ),
                   onPressed: onLike, // Handle like functionality
                 ),

@@ -11,15 +11,8 @@ class PostUploader {
 
   PostUploader({required this.userId, required this.username, required this.avatarUrl});
 
-  Future<void> createPost(String caption) async {
+  Future<void> createPost(String caption, {String? location}) async {
     try {
-      // Check if the user is authenticated
-      final user = _supabase.auth.currentUser;
-      if (user == null) {
-        print('User is not authenticated');
-        return;
-      }
-
       // Pick an image from the gallery
       final picker = ImagePicker();
       final pickedImage = await picker.pickImage(source: ImageSource.gallery);
@@ -29,50 +22,54 @@ class PostUploader {
       }
 
       final imageFile = File(pickedImage.path);
-
-      // Generate a unique file name for the uploaded image
       final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final filePath = 'posts/$fileName';  // Updated path to 'posts'
+      final filePath = 'posts/$fileName';
 
-      // Reference the correct bucket in Supabase storage
-      final storageRef = _supabase.storage.from('images'); // Ensure the bucket is named 'images'
+      print('Attempting to upload image to path: $filePath');
 
+      // Upload image to Supabase Storage
       try {
-        // Upload image to Supabase storage
-        final uploadResponse = await storageRef.upload(filePath, imageFile);
-        print('File uploaded successfully');
+        // Make sure 'images' bucket exists in your Supabase storage
+        await _supabase.storage
+            .from('images')
+            .upload(filePath, imageFile, fileOptions: const FileOptions(
+              cacheControl: '3600',
+              upsert: false,
+            ));
 
-        // Get the public URL of the uploaded image
-        final imageUrl = storageRef.getPublicUrl(filePath);
-        print('Image public URL: $imageUrl');
+        // Get the public URL
+        final imageUrl = _supabase.storage
+            .from('images')
+            .getPublicUrl(filePath);
 
-        // Insert post data into Supabase database
-        final postResponse = await _supabase
+        print('Image uploaded successfully. URL: $imageUrl');
+
+        // Create the post
+        final response = await _supabase
             .from('posts')
             .insert({
-          'user_id': user.id,
-          'username': username,
-          'avatar_url': avatarUrl,
-          'image_url': imageUrl,  // Store the image URL in the database
-          'caption': caption,
-          'timestamp': DateTime.now().toIso8601String(),
-          'likes': 0,
-          'liked_users': [],
-          'comments': [],
-        })
-            .select();
+              'user_id': userId,
+              'username': username,
+              'avatar_url': avatarUrl,
+              'image_url': imageUrl,
+              'caption': caption,
+              'timestamp': DateTime.now().toIso8601String(),
+              'likes': 0,
+              'liked_users': [],
+              'comments': [],
+              'location': location ?? '',
+            })
+            .select()
+            .single();
 
-        // Check for successful insertion
-        if (postResponse is List && postResponse.isNotEmpty) {
-          print('Post created successfully!');
-        } else {
-          print('Failed to create post. Response: $postResponse');
-        }
-      } catch (error) {
-        print('Upload Error: $error');
+        print('Post created successfully with data: $response');
+      } catch (e) {
+        print('Storage error: $e');
+        throw e;
       }
     } catch (e) {
-      print('Failed to create post: $e');
+      print('Error creating post: $e');
+      rethrow;
     }
   }
-  }
+}

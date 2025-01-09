@@ -11,10 +11,11 @@ import 'package:flickfeedpro/login/loginviewmodel.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Supabase
+  // Initialize Supabase with your actual credentials
   await Supabase.initialize(
     url: 'https://bvlmfeoikgsayrcelccq.supabase.co',
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ2bG1mZW9pa2dzYXlyY2VsY2NxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzMxMjE4NDcsImV4cCI6MjA0ODY5Nzg0N30.VpHNOpfAa243g9PBHv-Gp5I7ynwvsggSLOPmvSiE9aw',
+    debug: true  // Keep this for debugging
   );
 
   runApp(
