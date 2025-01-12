@@ -1,208 +1,131 @@
 import 'package:flutter/material.dart';
-import 'package:ionicons/ionicons.dart';
-import 'package:flickfeedpro/models/comment.dart';
-import 'package:flickfeedpro/models/posts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../models/posts.dart';
 
-class CommentSection extends StatefulWidget {
+class CommentSectionWidget extends StatefulWidget {
   final Post post;
+  final Function onCommentAdded;
 
-  CommentSection({required this.post});
+  const CommentSectionWidget({
+    super.key,
+    required this.post,
+    required this.onCommentAdded,
+  });
 
   @override
-  _CommentSectionState createState() => _CommentSectionState();
+  _CommentSectionWidgetState createState() => _CommentSectionWidgetState();
 }
 
-class _CommentSectionState extends State<CommentSection> {
+class _CommentSectionWidgetState extends State<CommentSectionWidget> {
   final TextEditingController _commentController = TextEditingController();
-  final Map<int, TextEditingController> _replyControllers = {};
+  final _supabase = Supabase.instance.client;
+  bool _isPostingComment = false;
 
-  void _addComment(String text) {
-    if (text.isEmpty) return;
+  Future<void> _postComment() async {
+    if (_commentController.text.trim().isEmpty) return;
 
-    final newComment = Comment(
-      username: 'CurrentUser',
-      avatarUrl: 'assets/images/your_avatar.jpg',
-      text: text,
-      timestamp: DateTime.now(),
-      replies: [],
-    );
+    setState(() => _isPostingComment = true);
 
-    setState(() {
-      widget.post.comments.add(newComment);
-    });
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) return;
 
-    _commentController.clear();
-  }
+      // Get user details
+      final userResponse = await _supabase
+          .from('userdetails')
+          .select('username, avatar_url')
+          .eq('id', userId)
+          .single();
 
-  void _addReply(String text, List<Comment> replies) {
-    if (text.isEmpty) return;
+      // Create comment
+      final comment = {
+        'post_id': widget.post.postId,
+        'user_id': userId,
+        'text': _commentController.text.trim(),
+        'username': userResponse['username'],
+        'avatar_url': userResponse['avatar_url'],
+        'created_at': DateTime.now().toIso8601String(),
+      };
 
-    final newReply = Comment(
-      username: 'CurrentUser',
-      avatarUrl: 'assets/images/your_avatar.jpg',
-      text: text,
-      timestamp: DateTime.now(),
-      replies: [],
-    );
+      await _supabase.from('comments').insert(comment);
 
-    setState(() {
-      replies.add(newReply);
-    });
-  }
-
-  void _toggleCommentLike(Comment comment) {
-    setState(() {
-      comment.isLiked = !comment.isLiked;
-      comment.likes += comment.isLiked ? 1 : -1;
-    });
-  }
-
-  void _toggleRepliesVisibility(Comment comment) {
-    setState(() {
-      comment.areRepliesVisible = !comment.areRepliesVisible;
-    });
-  }
-
-  void _handleSwipeAction(Comment comment, String action) {
-    setState(() {
-      if (action == 'Delete') {
-        widget.post.comments.remove(comment);
+      // Create notification for comment
+      if (widget.post.userId != userId) {  // Don't notify if user comments on their own post
+        await _supabase.from('notifications').insert({
+          'recipient_id': widget.post.userId,
+          'sender_id': userId,
+          'type': 'comment',
+          'content': _commentController.text.trim(),
+          'post_id': widget.post.postId,
+          'created_at': DateTime.now().toUtc().toIso8601String(),
+        });
       }
-    });
+
+      if (mounted) {
+        _commentController.clear();
+        widget.onCommentAdded();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error posting comment: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isPostingComment = false);
+      }
+    }
   }
 
-  Widget _buildCommentTile(Comment comment, int parentIndex, List<Comment> parentReplies, {int depth = 0}) {
-    int replyIndex = depth * 1000 + parentReplies.indexOf(comment);
-    _replyControllers[replyIndex] ??= TextEditingController();
-
-    return Padding(
-      padding: EdgeInsets.only(left: depth * 16.0), // Adjust padding based on depth
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: Colors.grey[300]!)),
+      ),
+      child: Row(
         children: [
-          Dismissible(
-            key: Key(comment.text),
-            background: Container(
-              color: Colors.red,
-              alignment: Alignment.centerLeft,
-              padding: EdgeInsets.symmetric(horizontal: 20.0),
-              child: Icon(Icons.delete, color: Colors.white),
-            ),
-            secondaryBackground: Container(
-              color: Colors.blue,
-              alignment: Alignment.centerRight,
-              padding: EdgeInsets.symmetric(horizontal: 20.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Icon(Icons.report, color: Colors.white),
-                  SizedBox(width: 10),
-                  Icon(Icons.person, color: Colors.white),
-                ],
-              ),
-            ),
-            onDismissed: (direction) {
-              if (direction == DismissDirection.startToEnd) {
-                _handleSwipeAction(comment, 'Delete');
-              } else if (direction == DismissDirection.endToStart) {
-                _handleSwipeAction(comment, 'Report');
-              }
-            },
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundImage: AssetImage(comment.avatarUrl),
-              ),
-              title: Row(
-                children: [
-                  Text(comment.username),
-                  SizedBox(width: 5),
-                  Expanded(
-                    child: Text(
-                      comment.text,
-                      style: TextStyle(fontWeight: FontWeight.normal),
-                    ),
-                  ),
-                ],
-              ),
-              subtitle: Row(
-                children: [
-                  Text(
-                    '${comment.timestamp.hour}:${comment.timestamp.minute}',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                  SizedBox(width: 10),
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        comment.isReplying = !comment.isReplying;
-                      });
-                    },
-                    child: Text(
-                      'Reply',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('${comment.likes}'),
-                  IconButton(
-                    icon: Icon(
-                      comment.isLiked ? Ionicons.heart : Ionicons.heart_outline,
-                      color: comment.isLiked ? Colors.red : Colors.black,
-                    ),
-                    onPressed: () => _toggleCommentLike(comment),
-                  ),
-                ],
-              ),
+          CircleAvatar(
+            radius: 16,
+            backgroundImage: NetworkImage(
+              _supabase.auth.currentUser?.userMetadata?['avatar_url'] ??
+                  'https://via.placeholder.com/32',
             ),
           ),
-          if (comment.replies.isNotEmpty)
-            GestureDetector(
-              onTap: () => _toggleRepliesVisibility(comment),
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.0),
-                child: Text(
-                  comment.areRepliesVisible ? 'Hide replies' : 'View replies',
-                  style: TextStyle(color: Colors.grey, fontSize: 12),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              controller: _commentController,
+              decoration: InputDecoration(
+                hintText: 'Add a comment...',
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(vertical: 8),
+              ),
+              maxLines: null,
+            ),
+          ),
+          if (_isPostingComment)
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else
+            TextButton(
+              onPressed: _postComment,
+              child: Text(
+                'Post',
+                style: TextStyle(
+                  color: _commentController.text.trim().isEmpty
+                      ? Colors.blue.withOpacity(0.5)
+                      : Colors.blue,
                 ),
-              ),
-            ),
-          if (comment.areRepliesVisible)
-            Padding(
-              padding: EdgeInsets.only(left: 16.0), // Adjust padding for replies
-              child: Column(
-                children: comment.replies.map((reply) {
-                  return _buildCommentTile(reply, parentIndex, comment.replies, depth: depth + 1);
-                }).toList(),
-              ),
-            ),
-          if (comment.isReplying)
-            Padding(
-              padding: EdgeInsets.only(left: 32.0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _replyControllers[replyIndex],
-                      decoration: InputDecoration(
-                        hintText: 'Reply to @${comment.username}',
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: Icon(Ionicons.send_outline),
-                    onPressed: () {
-                      _addReply(_replyControllers[replyIndex]!.text, comment.replies);
-                      _replyControllers[replyIndex]?.clear();
-                      setState(() {
-                        comment.isReplying = false;
-                      });
-                    },
-                  ),
-                ],
               ),
             ),
         ],
@@ -211,73 +134,8 @@ class _CommentSectionState extends State<CommentSection> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => Navigator.of(context).pop(),
-      child: Material(
-        color: Colors.black.withOpacity(0.4), // Dark semi-transparent background
-        child: GestureDetector(
-          onTap: () {}, // Prevents tap event from propagating to the outer GestureDetector
-          child: DraggableScrollableSheet(
-            initialChildSize: 0.5,
-            minChildSize: 0.3,
-            maxChildSize: 0.8,
-            builder: (_, controller) {
-              return Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                  boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 10)],
-                ),
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: widget.post.comments.length,
-                        itemBuilder: (context, index) {
-                          final comment = widget.post.comments[index];
-                          return _buildCommentTile(comment, index, widget.post.comments);
-                        },
-                      ),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.all(8.0),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _commentController,
-                              decoration: InputDecoration(
-                                hintText: 'Add a comment...',
-                              ),
-                            ),
-                          ),
-                          IconButton(
-                            icon: Icon(Ionicons.send_outline),
-                            onPressed: () => _addComment(_commentController.text),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
-      ),
-    );
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
   }
-}
-
-// To open the CommentSection as a popup
-void showCommentSection(BuildContext context, Post post) {
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (BuildContext context) {
-      return CommentSection(post: post);
-    },
-  );
 }

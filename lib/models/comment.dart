@@ -1,165 +1,49 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class Comment {
-  final String username;
-  final String avatarUrl;
+  final String id;
+  final String userId;
+  final String postId;
   final String text;
-  final DateTime timestamp;
+  final DateTime createdAt;
   int likes;
-  bool isLiked;
-  bool isReplying;
-  List<Comment> replies;
-  bool areRepliesVisible;
-  String? commentId; // The unique identifier for the comment
+  List<String> likedUsers;
+  final String username;
+  final String? avatarUrl;
+  final String? parentId;
+  final List<Comment> replies;
+  int replyCount;
 
   Comment({
-    required this.username,
-    required this.avatarUrl,
+    required this.id,
+    required this.userId,
+    required this.postId,
     required this.text,
-    required this.timestamp,
-    this.likes = 0,
-    this.isLiked = false,
-    this.isReplying = false,
+    required this.createdAt,
+    required this.likes,
+    required this.likedUsers,
+    required this.username,
+    this.avatarUrl,
+    this.parentId,
     List<Comment>? replies,
-    this.areRepliesVisible = false,
-    this.commentId,
+    this.replyCount = 0,
   }) : replies = replies ?? [];
 
-  // Factory constructor to create a Comment from a map (Supabase data)
   factory Comment.fromMap(Map<String, dynamic> map) {
     return Comment(
+      id: map['id']?.toString() ?? '',
+      postId: map['post_id']?.toString() ?? '',
+      userId: map['user_id'] ?? '',
+      parentId: map['parent_id']?.toString(),
       username: map['username'] ?? '',
-      avatarUrl: map['avatar_url'] ?? '',
+      avatarUrl: map['avatar_url'],
       text: map['text'] ?? '',
-      timestamp: DateTime.parse(map['timestamp']),
-      likes: map['likes'] ?? 0,
-      isLiked: map['is_liked'] ?? false,
-      isReplying: map['is_replying'] ?? false,
-      replies: (map['replies'] as List<dynamic>? ?? [])
-          .map((reply) => Comment.fromMap(reply))
-          .toList(),
-      areRepliesVisible: map['are_replies_visible'] ?? false,
-      commentId: map['id'], // The comment's unique ID
+      createdAt: DateTime.parse(map['created_at']),
+      likes: map['likes']?.toInt() ?? 0,
+      likedUsers: List<String>.from(map['liked_users'] ?? []),
+      replyCount: map['reply_count']?.toInt() ?? 0,
     );
   }
 
-  // Method to convert a Comment object to a map (for saving to Supabase)
-  Map<String, dynamic> toMap() {
-    return {
-      'username': username,
-      'avatar_url': avatarUrl,
-      'text': text,
-      'timestamp': timestamp.toIso8601String(),
-      'likes': likes,
-      'is_liked': isLiked,
-      'is_replying': isReplying,
-      'are_replies_visible': areRepliesVisible,
-      // Don't store replies directly here as they are handled in a separate table
-    };
-  }
-
-  // Future method to add a comment to Supabase
-  Future<void> addComment(String postId) async {
-    try {
-      final response = await Supabase.instance.client
-          .from('comments')
-          .insert({
-        'username': username,
-        'avatar_url': avatarUrl,
-        'text': text,
-        'timestamp': timestamp.toIso8601String(),
-        'likes': likes,
-        'is_liked': isLiked,
-        'is_replying': isReplying,
-        'post_id': postId,
-        'are_replies_visible': areRepliesVisible,
-      })
-          .execute();
-
-      // No error check; only check if data is returned
-      if (response.data != null) {
-        print('Comment added successfully');
-      } else {
-        print('Failed to add comment: ${response.status}');
-      }
-    } catch (e) {
-      print('Failed to add comment: $e');
-    }
-  }
-
-  // Future method to retrieve comments for a specific post from Supabase
-  static Future<List<Comment>> getComments(String postId) async {
-    try {
-      final response = await Supabase.instance.client
-          .from('comments')
-          .select('*')
-          .eq('post_id', postId)
-          .order('timestamp', ascending: false)
-          .execute();
-
-      // Directly check the response status
-      if (response.status == 200 && response.data != null) {
-        return List<Comment>.from(response.data
-            .map<Comment>((data) => Comment.fromMap(data)));
-      } else {
-        print('No comments found or failed to fetch comments');
-        return [];
-      }
-    } catch (e) {
-      print('Failed to get comments: $e');
-      return [];
-    }
-  }
-
-  // Future method to delete a comment from Supabase
-  Future<void> deleteComment() async {
-    if (commentId == null) {
-      print('Comment ID is null');
-      return;
-    }
-
-    try {
-      final response = await Supabase.instance.client
-          .from('comments')
-          .delete()
-          .eq('id', commentId)
-          .execute();
-
-      // Directly check if the deletion was successful
-      if (response.status == 200) {
-        print('Comment deleted successfully');
-      } else {
-        print('Failed to delete comment: ${response.status}');
-      }
-    } catch (e) {
-      print('Failed to delete comment: $e');
-    }
-  }
-
-  // Future method to update a comment's like status
-  Future<void> toggleLike(String userId) async {
-    try {
-      isLiked = !isLiked;
-      if (isLiked) {
-        likes++;
-      } else {
-        likes--;
-      }
-
-      final response = await Supabase.instance.client
-          .from('comments')
-          .update({'likes': likes, 'is_liked': isLiked})
-          .eq('id', commentId)
-          .execute();
-
-      // Check if like update was successful based on status
-      if (response.status == 200) {
-        print('Comment like status updated successfully');
-      } else {
-        print('Failed to toggle like: ${response.status}');
-      }
-    } catch (e) {
-      print('Failed to toggle like: $e');
-    }
-  }
+  bool get isLiked => likedUsers.contains(Supabase.instance.client.auth.currentUser?.id);
 }

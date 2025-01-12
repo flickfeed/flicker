@@ -1,204 +1,263 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'usersprofilescreen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import 'user_profile_screen.dart';
 
 class SearchScreen extends StatefulWidget {
+  const SearchScreen({super.key});
+
   @override
   _SearchScreenState createState() => _SearchScreenState();
 }
 
 class _SearchScreenState extends State<SearchScreen> {
-  final TextEditingController _searchController = TextEditingController();
-  List<Map<String, dynamic>> _filteredUsers = [];
+  final _supabase = Supabase.instance.client;
+  List<Map<String, dynamic>> _users = [];
+  List<Map<String, dynamic>> _recentSearches = [];
   bool _isLoading = false;
-
-  final SupabaseClient supabase = Supabase.instance.client;
+  bool _isSearching = false;
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
+  late SharedPreferences _prefs;
 
   @override
   void initState() {
     super.initState();
+    _initPrefs();
     _searchController.addListener(() {
-      _searchUsers(_searchController.text.trim());
+      if (_searchController.text.isNotEmpty) {
+        _searchUsers(_searchController.text);
+      } else {
+        setState(() {
+          _users.clear();
+        });
+      }
     });
   }
 
-  // Search for users by username
+  Future<void> _initPrefs() async {
+    _prefs = await SharedPreferences.getInstance();
+    _loadRecentSearches();
+  }
+
+  Future<void> _loadRecentSearches() async {
+    final recentSearchesJson = _prefs.getStringList('recent_searches') ?? [];
+    setState(() {
+      _recentSearches = recentSearchesJson
+          .map((String jsonStr) => json.decode(jsonStr) as Map<String, dynamic>)
+          .toList();
+    });
+  }
+
+  Future<void> _addToRecentSearches(Map<String, dynamic> user) async {
+    // Remove if already exists
+    _recentSearches.removeWhere((search) => search['id'] == user['id']);
+    
+    // Add to beginning of list
+    _recentSearches.insert(0, user);
+    
+    // Keep only last 10 searches
+    if (_recentSearches.length > 10) {
+      _recentSearches = _recentSearches.sublist(0, 10);
+    }
+
+    // Save to SharedPreferences
+    final recentSearchesJson = _recentSearches
+        .map((search) => json.encode(search))
+        .toList();
+    await _prefs.setStringList('recent_searches', recentSearchesJson);
+
+    setState(() {});
+  }
+
+  Future<void> _removeFromRecentSearches(String userId) async {
+    setState(() {
+      _recentSearches.removeWhere((search) => search['id'] == userId);
+    });
+
+    // Save updated list to SharedPreferences
+    final recentSearchesJson = _recentSearches
+        .map((search) => json.encode(search))
+        .toList();
+    await _prefs.setStringList('recent_searches', recentSearchesJson);
+  }
+
   Future<void> _searchUsers(String query) async {
     if (query.isEmpty) {
       setState(() {
-        _filteredUsers.clear();
+        _users.clear();
+        _isLoading = false;
       });
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
-      final response = await supabase
-          .from('users') // Assuming your users are stored in a table named 'users'
+      final response = await _supabase
+          .from('userdetails')
           .select()
-          .ilike('username', '%$query%') // Perform case-insensitive search
-          .execute();
+          .or('username.ilike.%$query%, name.ilike.%$query%')
+          .limit(20);
 
-      // Check if the data is returned, and update UI
-      if (response.data != null) {
-        setState(() {
-          _filteredUsers = List<Map<String, dynamic>>.from(response.data);
-        });
-      } else {
-        // If no data is returned, show a message
-        setState(() {
-          _filteredUsers.clear();
-        });
-      }
-    } catch (e) {
-      print("Error fetching users: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error fetching users")),
-      );
-    } finally {
       setState(() {
+        _users = List<Map<String, dynamic>>.from(response);
         _isLoading = false;
       });
+    } catch (e) {
+      print('Error searching users: $e');
+      setState(() => _isLoading = false);
     }
   }
 
-  // Check if the user is following the searched user
-  Future<bool> _isFollowing(String userId) async {
-    final user = supabase.auth.currentUser;
-    if (user == null) return false;
-
-    final response = await supabase
-        .from('followers') // Assuming the followers are stored in a 'followers' table
-        .select()
-        .eq('follower_id', user.id)
-        .eq('followed_id', userId)
-        .single()
-        .execute();
-
-    return response.data != null;
+  Widget _buildUserTile(Map<String, dynamic> user, {bool isRecent = false}) {
+    return ListTile(
+      leading: CircleAvatar(
+        backgroundImage: user['avatar_url'] != null
+            ? NetworkImage(user['avatar_url'])
+            : null,
+        child: user['avatar_url'] == null
+            ? Icon(Icons.person, color: Colors.grey[400])
+            : null,
+      ),
+      title: Text(
+        user['username'] ?? '',
+        style: TextStyle(fontWeight: FontWeight.bold),
+      ),
+      subtitle: user['name'] != null && user['name'].toString().isNotEmpty
+          ? Text(user['name'])
+          : null,
+      trailing: isRecent
+          ? IconButton(
+              icon: Icon(Icons.close, size: 18),
+              onPressed: () => _removeFromRecentSearches(user['id']),
+            )
+          : null,
+      onTap: () {
+        _addToRecentSearches(user);
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => UserProfileScreen(
+              userId: user['id'],
+              username: user['username'] ?? '',
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        title: TextField(
-          controller: _searchController,
-          decoration: InputDecoration(
-            hintText: 'Search users',
-            border: InputBorder.none,
-            hintStyle: TextStyle(color: Colors.grey),
-            prefixIcon: Icon(Icons.search, color: Colors.grey),
+      appBar: PreferredSize(
+        preferredSize: Size.fromHeight(60),
+        child: Container(
+          color: Colors.white,
+          child: SafeArea(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        focusNode: _focusNode,
+                        decoration: InputDecoration(
+                          hintText: 'Search',
+                          prefixIcon: Icon(Icons.search),
+                          border: InputBorder.none,
+                          suffixIcon: _searchController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: Icon(Icons.clear),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() {
+                                      _users.clear();
+                                    });
+                                  },
+                                )
+                              : null,
+                        ),
+                        onTap: () {
+                          setState(() => _isSearching = true);
+                        },
+                      ),
+                    ),
+                  ),
+                  if (_isSearching)
+                    Padding(
+                      padding: EdgeInsets.only(left: 16),
+                      child: GestureDetector(
+                        onTap: () {
+                          _focusNode.unfocus();
+                          setState(() {
+                            _isSearching = false;
+                            _searchController.clear();
+                            _users.clear();
+                          });
+                        },
+                        child: Text(
+                          'Cancel',
+                          style: TextStyle(color: Colors.blue),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
       body: _isLoading
           ? Center(child: CircularProgressIndicator())
-          : _filteredUsers.isEmpty && _searchController.text.isNotEmpty
-          ? Center(child: Text("No users found"))
-          : ListView.builder(
-        itemCount: _filteredUsers.length,
-        itemBuilder: (context, index) {
-          final user = _filteredUsers[index];
-          String userId = user['id'];
-
-          return FutureBuilder<bool>(
-            future: _isFollowing(userId),
-            builder: (context, snapshot) {
-              bool isFollowing = snapshot.data ?? false;
-
-              return ListTile(
-                leading: CircleAvatar(
-                  radius: 25,
-                  backgroundImage: NetworkImage(
-                    user['profile_image_url'] ??
-                        'https://example.com/default_profile_image.jpg',
-                  ),
-                ),
-                title: Text(user['username'] ?? 'Unknown'),
-                trailing: ElevatedButton(
-                  onPressed: () {
-                    if (isFollowing) {
-                      _unfollowUser(userId);
-                    } else {
-                      _followUser(userId);
-                    }
-                  },
-                  child: Text(isFollowing ? 'Unfollow' : 'Follow'),
-                ),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => UsersProfileScreen(
-                        username: user['username'],
-                        name: user['name'] ?? 'User',
-                        avatarUrl: user['profile_image_url'] ??
-                            'https://example.com/default_profile_image.jpg',
-                        postCount: user['post_count'] ?? 0,
-                        followerCount: user['follower_count'] ?? 0,
-                        followingCount: user['following_count'] ?? 0,
-                        bio: user['bio'] ?? '',
-                        isFollowing: isFollowing,
-                      ),
+          : ListView(
+              children: [
+                if (_searchController.text.isEmpty && _recentSearches.isNotEmpty)
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Recent',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () async {
+                            await _prefs.remove('recent_searches');
+                            setState(() {
+                              _recentSearches.clear();
+                            });
+                          },
+                          child: Text('Clear All'),
+                        ),
+                      ],
                     ),
-                  );
-                },
-              );
-            },
-          );
-        },
-      ),
+                  ),
+                if (_searchController.text.isEmpty)
+                  ..._recentSearches.map((user) => _buildUserTile(user, isRecent: true)),
+                if (_searchController.text.isNotEmpty)
+                  ..._users.map((user) => _buildUserTile(user)),
+              ],
+            ),
     );
   }
 
-  // Follow a user
-  void _followUser(String followedUserId) async {
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
-
-    final currentUserId = user.id;
-
-    // Add the followed user to the current user's "following" list
-    await supabase.from('followers').insert([
-      {'follower_id': currentUserId, 'followed_id': followedUserId}
-    ]).execute();
-
-    // Add the current user to the followed user's "followers" list
-    await supabase.from('followers').insert([
-      {'follower_id': followedUserId, 'followed_id': currentUserId}
-    ]).execute();
-
-    setState(() {});
-  }
-
-  // Unfollow a user
-  void _unfollowUser(String followedUserId) async {
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
-
-    final currentUserId = user.id;
-
-    // Remove the followed user from the current user's "following" list
-    await supabase
-        .from('followers')
-        .delete()
-        .eq('follower_id', currentUserId)
-        .eq('followed_id', followedUserId)
-        .execute();
-
-    // Remove the current user from the followed user's "followers" list
-    await supabase
-        .from('followers')
-        .delete()
-        .eq('follower_id', followedUserId)
-        .eq('followed_id', currentUserId)
-        .execute();
-
-    setState(() {});
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _focusNode.dispose();
+    super.dispose();
   }
 }

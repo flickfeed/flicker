@@ -7,6 +7,8 @@ import 'profile_screen.dart';
 import 'sharepostscreen.dart';
 
 class MainScreen extends StatefulWidget {
+  const MainScreen({super.key});
+
   @override
   _MainScreenState createState() => _MainScreenState();
 }

@@ -10,11 +10,11 @@ class SharePostScreen extends StatefulWidget {
   final String caption; // Post's caption
 
   const SharePostScreen({
-    Key? key,
+    super.key,
     required this.postId,
     required this.imageUrl,
     required this.caption,
-  }) : super(key: key);
+  });
 
   @override
   _SharePostScreenState createState() => _SharePostScreenState();

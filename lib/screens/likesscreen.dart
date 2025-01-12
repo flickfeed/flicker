@@ -4,7 +4,7 @@ import 'package:ionicons/ionicons.dart';
 class LikesScreen extends StatelessWidget {
   final List<String> likedUsers;
 
-  LikesScreen({required this.likedUsers});
+  const LikesScreen({super.key, required this.likedUsers});
 
   @override
   Widget build(BuildContext context) {

@@ -1,93 +1,233 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import 'package:supabase_flutter/supabase_flutter.dart'; // Import Supabase
-import 'package:flickfeedpro/models/posts.dart';
+import 'package:ionicons/ionicons.dart';
+import '../models/posts.dart';
+import '../screens/comments_screen.dart';
+import '../screens/user_profile_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class PostWidget extends StatelessWidget {
   final Post post;
-  final VoidCallback onLike; // Callback for like functionality
-  final VoidCallback onComment; // Callback for comment functionality
+  final VoidCallback onPostUpdated;
+  final Function(String) onPostDeleted;
 
-  PostWidget({
+  const PostWidget({
+    Key? key,
     required this.post,
-    required this.onLike,
-    required this.onComment,
-  });
+    required this.onPostUpdated,
+    required this.onPostDeleted,
+  }) : super(key: key);
 
-  String _formatTimestamp(DateTime timestamp) {
-    final timeDifference = DateTime.now().difference(timestamp);
+  Future<void> _handleLike(BuildContext context) async {
+    try {
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) return;
 
-    if (timeDifference.inMinutes < 1) return 'Just now';
-    if (timeDifference.inHours < 1) return '${timeDifference.inMinutes} minutes ago';
-    if (timeDifference.inDays < 1) return '${timeDifference.inHours} hours ago';
-    return DateFormat.yMMMd().format(timestamp); // e.g., "Sep 20, 2023"
+      await post.toggleLike(userId);
+      onPostUpdated(); // Refresh the UI after like
+    } catch (e) {
+      print('Error liking post: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating like')),
+        );
+      }
+    }
+  }
+
+  void _navigateToComments(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.9,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (context, scrollController) => CommentsScreen(
+          post: post,
+          onCommentAdded: () {
+            post.updateCommentCount(post.commentCount + 1);
+            onPostUpdated();
+          },
+          scrollController: scrollController,
+        ),
+      ),
+    );
+  }
+
+  void _navigateToUserProfile(BuildContext context, String userId, String username) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => UserProfileScreen(
+          userId: userId,
+          username: username,
+        ),
+      ),
+    );
+  }
+
+  void _showDeleteDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Delete Post'),
+          content: Text('Are you sure you want to delete this post?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await _deletePost(context);
+              },
+              child: Text(
+                'Delete',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _deletePost(BuildContext context) async {
+    try {
+      final supabase = Supabase.instance.client;
+      
+      // First delete the image from storage
+      final imageUrl = post.imageUrl;
+      final uri = Uri.parse(imageUrl);
+      final imagePath = uri.pathSegments.last;
+      
+      await supabase.storage
+          .from('images')
+          .remove(['posts/$imagePath']);
+
+      // Then delete the post from the database
+      await supabase
+          .from('posts')
+          .delete()
+          .eq('id', post.postId);
+
+      // Call the delete callback with the post ID
+      onPostDeleted(post.postId);
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Post deleted successfully')),
+        );
+      }
+    } catch (e) {
+      print('Error deleting post: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to delete post')),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
-    
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 15.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ListTile(
-            leading: CircleAvatar(
-              backgroundImage: NetworkImage(post.avatarUrl), // Display user's avatar
-            ),
-            title: Text(post.username),
-            subtitle: Text(_formatTimestamp(post.timestamp)), // Format the timestamp
-          ),
-          Container(
-            height: 300,
-            width: double.infinity,
-            child: Image.network(
-              post.imageUrl,
-              fit: BoxFit.cover,
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child; // Loaded successfully
-                return Center(
-                  child: CircularProgressIndicator(
-                    value: loadingProgress.expectedTotalBytes != null
-                        ? loadingProgress.cumulativeBytesLoaded / (loadingProgress.expectedTotalBytes ?? 1)
-                        : null,
-                  ),
-                );
-              },
+    final isCurrentUserPost = post.userId == Supabase.instance.client.auth.currentUser?.id;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // User header with clickable username
+        ListTile(
+          leading: GestureDetector(
+            onTap: () => _navigateToUserProfile(context, post.userId, post.username),
+            child: CircleAvatar(
+              backgroundImage: NetworkImage(post.avatarUrl ?? 'default_avatar_url'),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(10.0),
-            child: Row(
-              children: [
-                IconButton(
-                  icon: Icon(
-                    post.likedUsers.contains(currentUserId) // Use actual user ID
-                        ? Icons.favorite
-                        : Icons.favorite_border,
-                    color: post.likedUsers.contains(currentUserId) ? Colors.red : null,
-                  ),
-                  onPressed: onLike, // Handle like functionality
-                ),
-                Text('${post.likes} likes'),
-                const SizedBox(width: 20),
-                IconButton(
-                  icon: const Icon(Icons.comment_outlined),
-                  onPressed: onComment, // Handle comment functionality
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          title: GestureDetector(
+            onTap: () => _navigateToUserProfile(context, post.userId, post.username),
             child: Text(
-              post.caption,
-              style: const TextStyle(fontWeight: FontWeight.bold),
+              post.username,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
             ),
           ),
-        ],
-      ),
+          subtitle: post.location != null && post.location!.isNotEmpty
+              ? Text(post.location!)
+              : null,
+          trailing: isCurrentUserPost
+              ? IconButton(
+                  icon: Icon(Icons.more_vert),
+                  onPressed: () => _showDeleteDialog(context),
+                )
+              : null,
+        ),
+        // Post image
+        AspectRatio(
+          aspectRatio: 1,
+          child: Image.network(
+            post.imageUrl,
+            fit: BoxFit.cover,
+          ),
+        ),
+        // Post actions
+        Row(
+          children: [
+            IconButton(
+              icon: Icon(
+                post.likedUsers.contains(Supabase.instance.client.auth.currentUser?.id)
+                    ? Icons.favorite
+                    : Icons.favorite_border,
+                color: post.likedUsers.contains(Supabase.instance.client.auth.currentUser?.id)
+                    ? Colors.red
+                    : null,
+              ),
+              onPressed: () => _handleLike(context),
+            ),
+            IconButton(
+              icon: Icon(Icons.comment_outlined),
+              onPressed: () => _navigateToComments(context),
+            ),
+          ],
+        ),
+        // Likes count
+        if (post.likes > 0)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              '${post.likes} ${post.likes == 1 ? 'like' : 'likes'}',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        // Caption
+        if (post.caption.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: RichText(
+              text: TextSpan(
+                style: DefaultTextStyle.of(context).style,
+                children: [
+                  TextSpan(
+                    text: post.username,
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  TextSpan(text: ' '),
+                  TextSpan(text: post.caption),
+                ],
+              ),
+            ),
+          ),
+        SizedBox(height: 8),
+      ],
     );
   }
 }

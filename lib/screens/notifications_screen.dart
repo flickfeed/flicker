@@ -1,39 +1,51 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart'; // Import Supabase
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../utils/date_formatter.dart';
+import 'user_profile_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
+  const NotificationsScreen({super.key});
+
   @override
   _NotificationsScreenState createState() => _NotificationsScreenState();
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  final supabase = Supabase.instance.client; // Supabase instance
-  late Future<List<Map<String, dynamic>>> _notificationsFuture;
+  final _supabase = Supabase.instance.client;
+  List<Map<String, dynamic>> _notifications = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _notificationsFuture = _getNotifications('currentUserId'); // Replace with actual user ID
+    _loadNotifications();
   }
 
-  // Fetch notifications from Supabase for a specific user
-  Future<List<Map<String, dynamic>>> _getNotifications(String userId) async {
+  Future<void> _loadNotifications() async {
     try {
-      final response = await supabase
-          .from('notifications') // Replace with your notifications table in Supabase
-          .select()
-          .eq('user_id', userId)
-          .order('timestamp', ascending: false);
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) return;
 
-      if (response != null) {
-        return List<Map<String, dynamic>>.from(response as List);
-      } else {
-        print('Failed to fetch notifications: Response is null.');
-        return [];
-      }
+      final response = await _supabase
+          .from('notifications')
+          .select('sender:users(id, username)')
+          .eq('recipient_id', userId);
+
+      setState(() {
+        _notifications = response;
+        _isLoading = false;
+      });
+
+      // Mark notifications as read
+      await _supabase
+          .from('notifications')
+          .update({'is_read': true})
+          .eq('recipient_id', userId)
+          .eq('is_read', false);
+
     } catch (e) {
-      print('Error fetching notifications: $e');
-      return [];
+      print('Error loading notifications: $e');
+      setState(() => _isLoading = false);
     }
   }
 
@@ -41,85 +53,111 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Notifications'),
+        backgroundColor: Colors.white,
+        elevation: 1,
+        title: Text(
+          'Notifications',
+          style: TextStyle(color: Colors.black),
+        ),
       ),
-      body: FutureBuilder<List<Map<String, dynamic>>>(
-        future: _notificationsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
-          }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(child: Text('No notifications.'));
-          }
+      body: _isLoading
+          ? Center(child: CircularProgressIndicator())
+          : _notifications.isEmpty
+              ? Center(
+                  child: Text(
+                    'No notifications yet',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _loadNotifications,
+                  child: ListView.builder(
+                    itemCount: _notifications.length,
+                    itemBuilder: (context, index) {
+                      final notification = _notifications[index];
+                      String message = '';
+                      IconData icon;
+                      Color iconColor;
 
-          final notifications = snapshot.data!;
+                      switch (notification['type']) {
+                        case 'like':
+                          message = 'liked your post';
+                          icon = Icons.favorite;
+                          iconColor = Colors.red;
+                          break;
+                        case 'comment':
+                          message = 'commented: ${notification['content']}';
+                          icon = Icons.comment;
+                          iconColor = Colors.blue;
+                          break;
+                        case 'follow':
+                          message = 'started following you';
+                          icon = Icons.person;
+                          iconColor = Colors.green;
+                          break;
+                        default:
+                          message = notification['content'];
+                          icon = Icons.notifications;
+                          iconColor = Colors.grey;
+                      }
 
-          return ListView.builder(
-            itemCount: notifications.length,
-            itemBuilder: (context, index) {
-              final notification = notifications[index];
-              return ListTile(
-                leading: CircleAvatar(
-                  backgroundImage: NetworkImage(notification['profilePicUrl'] ?? ''),
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundImage: notification['sender']['avatar_url'] != null
+                              ? NetworkImage(notification['sender']['avatar_url'])
+                              : null,
+                          child: notification['sender']['avatar_url'] == null
+                              ? Icon(Icons.person)
+                              : null,
+                        ),
+                        title: RichText(
+                          text: TextSpan(
+                            style: DefaultTextStyle.of(context).style,
+                            children: [
+                              TextSpan(
+                                text: notification['sender']['username'],
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              TextSpan(text: ' $message'),
+                            ],
+                          ),
+                        ),
+                        subtitle: Text(
+                          DateFormatter.formatTimestamp(
+                            DateTime.parse(notification['created_at']),
+                          ),
+                        ),
+                        trailing: Icon(icon, color: iconColor),
+                        onTap: () {
+                          // Navigate based on notification type
+                          switch (notification['type']) {
+                            case 'like':
+                            case 'comment':
+                              if (notification['post_id'] != null) {
+                                Navigator.pushNamed(
+                                  context,
+                                  '/post-detail',
+                                  arguments: notification['post_id'],
+                                );
+                              }
+                              break;
+                            case 'follow':
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => UserProfileScreen(
+                                    userId: notification['sender_id'],
+                                    username: notification['sender']['username'],
+                                  ),
+                                ),
+                              );
+                              break;
+                          }
+                        },
+                      );
+                    },
+                  ),
                 ),
-                title: _buildNotificationText(notification),
-                subtitle: Text(_formatTime(notification['timestamp'])),
-                trailing: _buildNotificationTrailing(notification),
-              );
-            },
-          );
-        },
-      ),
     );
   }
-
-  Widget _buildNotificationText(Map<String, dynamic> notification) {
-    switch (notification['type']) {
-      case 'like':
-        return RichText(
-          text: TextSpan(
-            children: [
-              TextSpan(
-                text: notification['username'] ?? 'Unknown',
-                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
-              ),
-              TextSpan(
-                text: ' liked your post.',
-                style: TextStyle(color: Colors.black),
-              ),
-            ],
-          ),
-        );
-    // Handle other notification types (comment, follow, mention)
-      default:
-        return Text('Unknown notification type.');
-    }
-  }
-
-  // Format timestamp
-  String _formatTime(String timestamp) {
-    try {
-      DateTime dateTime = DateTime.parse(timestamp);
-      Duration difference = DateTime.now().difference(dateTime);
-
-      if (difference.inMinutes < 60) {
-        return '${difference.inMinutes}m';
-      } else if (difference.inHours < 24) {
-        return '${difference.inHours}h';
-      } else {
-        return '${difference.inDays}d';
-      }
-    } catch (e) {
-      print('Error formatting time: $e');
-      return 'Unknown time';
-    }
-  }
-
-  Widget? _buildNotificationTrailing(Map<String, dynamic> notification) {
-    if (notification['type'] == 'mention' && notification['postPicUrl'] != null) {
-      return Image.network(notification['postPicUrl'], width: 50, height: 50);
-    }
-    return null;
-  }
-}
+} 

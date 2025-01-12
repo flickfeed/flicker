@@ -6,27 +6,20 @@ class RegisterViewModel extends ChangeNotifier {
   bool loading = false;
   bool obscureText = true;
 
-  String _profileName = '', _username = '', _email = '', _password = '';
+  String _name = '', _username = '', _email = '', _password = '';
 
-  FocusNode profileNameFN = FocusNode();
+  FocusNode nameFN = FocusNode();
   FocusNode usernameFN = FocusNode();
   FocusNode emailFN = FocusNode();
   FocusNode passFN = FocusNode();
 
-  String get profileName => _profileName;
+  String get name => _name;
   String get username => _username;
   String get email => _email;
   String get password => _password;
 
-  void setProfileName(String profileName) {
-    _profileName = profileName;
-    notifyListeners();
-  }
-
-  void setUsername(String username) {
-    _username = username;
-    notifyListeners();
-  }
+  void setName(String name) => _name = name;
+  void setUsername(String username) => _username = username;
 
   void setEmail(String email) {
     _email = email;
@@ -44,41 +37,44 @@ class RegisterViewModel extends ChangeNotifier {
   }
 
   Future<void> register(BuildContext context) async {
-    if (formKey.currentState?.validate() ?? false) {
-      formKey.currentState?.save();
-      setLoading(true);
-
-      try {
-        final response = await Supabase.instance.client.auth.signUp(
-          email: _email,
-          password: _password,
-          data: {
-            'profileName': _profileName,
-            'username': _username,
-          },
-        );
-
-        if (response.user != null) {
-          Navigator.of(context).pushReplacementNamed('/login');
-        } else {
-          throw Exception('Registration failed.');
-        }
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
-      } finally {
-        setLoading(false);
-      }
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please fill in the form correctly')),
-      );
-    }
-  }
-
-  void setLoading(bool value) {
-    loading = value;
+    if (!formKey.currentState!.validate()) return;
+    formKey.currentState!.save();
+    
+    loading = true;
     notifyListeners();
+
+    try {
+      final AuthResponse res = await Supabase.instance.client.auth.signUp(
+        email: _email,
+        password: _password,
+      );
+
+      if (res.user != null) {
+        await Supabase.instance.client.from('userdetails').upsert({
+          'id': res.user!.id,
+          'name': _name,
+          'username': _username,
+          'avatar_url': null,
+          'bio': null,
+        });
+
+        if (context.mounted) {
+          Navigator.of(context).pushReplacementNamed('/home');
+        }
+      }
+    } catch (e) {
+      print('Registration error: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Registration failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      loading = false;
+      notifyListeners();
+    }
   }
 }

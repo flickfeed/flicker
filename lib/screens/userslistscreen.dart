@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'usersprofilescreen.dart';
+import 'user_profile_screen.dart';
 
 class SearchScreen extends StatefulWidget {
+  const SearchScreen({super.key});
+
   @override
   _SearchScreenState createState() => _SearchScreenState();
 }
@@ -124,22 +126,15 @@ class _SearchScreenState extends State<SearchScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => UsersProfileScreen(
+                      builder: (context) => UserProfileScreen(
+                        userId: user['id'],
                         username: user['username'],
-                        name: user['name'] ?? 'User',
-                        avatarUrl: user['profile_image_url'] ??
-                            'https://example.com/default_profile_image.jpg',
-                        postCount: user['post_count'] ?? 0,
-                        followerCount: user['follower_count'] ?? 0,
-                        followingCount: user['following_count'] ?? 0,
-                        bio: user['bio'] ?? '',
-                        isFollowing: isFollowing,
                       ),
                     ),
                   );
                 },
                 child: Container(
-                  color: Colors.grey[300],
+                  color: isFollowing ? Colors.blue[50] : Colors.white,
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [

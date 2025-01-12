@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'registerviewmodel.dart';
 
 class RegisterPage extends StatelessWidget {
+  const RegisterPage({super.key});
+
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
@@ -114,6 +116,22 @@ class RegisterPage extends StatelessWidget {
           autovalidateMode: AutovalidateMode.onUserInteraction,
           child: Column(
             children: [
+              // Name field
+              TextFormField(
+                enabled: !viewModel.loading,
+                decoration: _inputDecoration(
+                  label: 'Name',
+                  icon: Icons.person_outline,
+                ),
+                textInputAction: TextInputAction.next,
+                validator: (value) => value?.isEmpty ?? true ? "Please enter your name" : null,
+                onSaved: (value) => viewModel.setName(value ?? ''),
+                focusNode: viewModel.nameFN,
+                onFieldSubmitted: (_) {
+                  FocusScope.of(context).requestFocus(viewModel.usernameFN);
+                },
+              ),
+              const SizedBox(height: 15.0),
               // Username field
               TextFormField(
                 enabled: !viewModel.loading,

@@ -6,6 +6,8 @@ import 'package:flickfeedpro/login/loginviewmodel.dart';
 import 'package:flickfeedpro/register/registerpage.dart';
 
 class LoginPage extends StatefulWidget {
+  const LoginPage({super.key});
+
   @override
   _LoginPageState createState() => _LoginPageState();
 }
@@ -184,7 +186,7 @@ class _LoginPageState extends State<LoginPage> {
               padding: EdgeInsets.only(right: 10.0),
               child: InkWell(
                 onTap: () => viewModel.forgotPassword(context),
-                child: Container(
+                child: SizedBox(
                   width: 130,
                   height: 40,
                   child: Align(
@@ -202,20 +204,23 @@ class _LoginPageState extends State<LoginPage> {
             ),
           ),
           SizedBox(height: 20.0),
-          Container(
+          SizedBox(
             height: 45.0,
             width: double.infinity,
             child: ElevatedButton(
               style: ButtonStyle(
-                shape: MaterialStateProperty.all<RoundedRectangleBorder>(
+                shape: WidgetStateProperty.all<RoundedRectangleBorder>(
                   RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(40.0),
                   ),
                 ),
-                backgroundColor: MaterialStateProperty.all<Color>(
+                backgroundColor: WidgetStateProperty.all<Color>(
                   Colors.blue,
                 ),
               ),
+              onPressed: viewModel.loading
+                  ? null
+                  : () => viewModel.login(context),
               child: viewModel.loading
                   ? CircularProgressIndicator(
                 valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
@@ -228,9 +233,6 @@ class _LoginPageState extends State<LoginPage> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              onPressed: viewModel.loading
-                  ? null
-                  : () => viewModel.login(context),
             ),
           ),
         ],

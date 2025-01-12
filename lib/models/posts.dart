@@ -1,76 +1,54 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'comment.dart';
 
 class Post {
+  final String postId;
   final String userId;
-  final String username;
-  final String avatarUrl;
   final String imageUrl;
   final String caption;
+  final String? location;
+  final DateTime createdAt;
   int likes;
-  final List<Comment> comments;
-  final String location;
-  bool isHidden;
   List<String> likedUsers;
-  final DateTime timestamp;
-  int? postId;
+  final String username;
+  final String? avatarUrl;
+  int commentCount;
 
   Post({
+    required this.postId,
     required this.userId,
-    required this.username,
-    required this.avatarUrl,
     required this.imageUrl,
     required this.caption,
-    this.likes = 0,
-    this.comments = const [],
-    this.location = '',
-    this.isHidden = false,
-    this.likedUsers = const [],
-    required this.timestamp,
-    this.postId,
+    this.location,
+    required this.createdAt,
+    required this.likes,
+    required this.likedUsers,
+    required this.username,
+    this.avatarUrl,
+    this.commentCount = 0,
   });
 
-  // Factory constructor for Supabase data
   factory Post.fromMap(Map<String, dynamic> map) {
     return Post(
-      userId: map['user_id'],
-      username: map['username'] ?? '',
-      avatarUrl: map['avatar_url'] ?? '',
-      imageUrl: map['image_url'] ?? '',  // No URL logic here
+      postId: map['id'] ?? '',
+      userId: map['user_id'] ?? '',
+      imageUrl: map['image_url'] ?? '',
       caption: map['caption'] ?? '',
+      location: map['location'],
+      createdAt: DateTime.parse(map['created_at']),
       likes: map['likes'] ?? 0,
-      comments: (map['comments'] as List<dynamic>? ?? [])
-          .map((comment) => Comment.fromMap(comment))
-          .toList(),
-      location: map['location'] ?? '',
-      isHidden: map['is_hidden'] ?? false,
       likedUsers: List<String>.from(map['liked_users'] ?? []),
-      timestamp: DateTime.parse(map['timestamp']),
-      postId: map['id'],
+      username: map['username'] ?? '',
+      avatarUrl: map['avatar_url'],
+      commentCount: map['comment_count'] ?? 0,
     );
   }
 
-  // Converts Post to a Map
-  Map<String, dynamic> toMap() {
-    return {
-      'user_id': userId,
-      'username': username,
-      'avatar_url': avatarUrl,
-      'image_url': imageUrl,
-      'caption': caption,
-      'likes': likes,
-      'comments': comments.map((comment) => comment.toMap()).toList(),
-      'location': location,
-      'is_hidden': isHidden,
-      'liked_users': likedUsers,
-      'timestamp': timestamp.toIso8601String(),
-      'id': postId,
-    };
-  }
+  bool get isLiked => likedUsers.contains(Supabase.instance.client.auth.currentUser?.id);
 
-  // Like/unlike functionality
   Future<void> toggleLike(String userId) async {
     try {
+      final supabase = Supabase.instance.client;
+      
       if (likedUsers.contains(userId)) {
         likedUsers.remove(userId);
         likes--;
@@ -79,47 +57,39 @@ class Post {
         likes++;
       }
 
-      // Update the post in Supabase
-      final response = await Supabase.instance.client
+      await supabase
           .from('posts')
           .update({
-        'likes': likes,
-        'liked_users': likedUsers,
-      })
-          .eq('id', postId)
-          .execute();
+            'likes': likes,
+            'liked_users': likedUsers,
+          })
+          .eq('id', postId);
 
-      if (response.status == 200) {
-        print('Like toggled successfully');
+    } catch (e) {
+      print('Error updating like: $e');
+      // Revert on error
+      if (likedUsers.contains(userId)) {
+        likedUsers.remove(userId);
+        likes--;
       } else {
-        print('Failed to toggle like: ${response.status}');
+        likedUsers.add(userId);
+        likes++;
       }
-    } catch (e) {
-      print('Error toggling like: $e');
+      throw e;
     }
   }
 
-  // Adds a new post to Supabase
-  Future<void> addPost() async {
+  Future<void> updateCommentCount(int newCount) async {
     try {
-      final response = await Supabase.instance.client
+      await Supabase.instance.client
           .from('posts')
-          .insert(toMap())
-          .select()
-          .single();
-
-      if (response != null) {
-        postId = response['id'];
-        print('Post added successfully with ID: $postId');
-      }
+          .update({'comment_count': newCount})
+          .eq('id', postId);
+      
+      commentCount = newCount;  // Update local state after successful DB update
     } catch (e) {
-      print('Failed to add post: $e');
-      rethrow; // This will help with debugging
+      print('Error updating comment count: $e');
+      throw e;  // Rethrow to handle in UI
     }
-  }
-
-  @override
-  String toString() {
-    return 'Post{id: $postId, userId: $userId, username: $username, caption: $caption, imageUrl: $imageUrl}';
   }
 }

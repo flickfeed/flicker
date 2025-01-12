@@ -8,8 +8,11 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:path/path.dart' as path;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../widgets/upload_progress.dart';
 
 class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
   @override
   _HomeScreenState createState() => _HomeScreenState();
 }
@@ -17,6 +20,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   File? _selectedImage;
+  final FeedScreen _feedScreen = FeedScreen();
 
   void _onTabTapped(int index) {
     if (index == 2) {
@@ -86,15 +90,57 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _uploadImage(File imageFile, String caption, String location) async {
     try {
+      // Show initial upload progress dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return UploadProgressDialog(
+            progress: 0,
+            status: 'Preparing upload...',
+          );
+        },
+      );
+
+      print('Starting image upload...');
       final fileName = path.basename(imageFile.path);
       final byteData = await imageFile.readAsBytes();
+
+      // Update progress for file upload
+      if (mounted) {
+        Navigator.of(context).pop();
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            return UploadProgressDialog(
+              progress: 0.3,
+              status: 'Uploading image...',
+            );
+          },
+        );
+      }
 
       final filePath = await Supabase.instance.client.storage
           .from('images')
           .uploadBinary('posts/$fileName', byteData);
 
-      if (filePath == null || filePath.isEmpty) {
-        throw Exception('Failed to upload image: No file path returned.');
+      // Example usage
+      print('File uploaded to: $filePath');
+
+      // Update progress for post creation
+      if (mounted) {
+        Navigator.of(context).pop();
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            return UploadProgressDialog(
+              progress: 0.6,
+              status: 'Creating post...',
+            );
+          },
+        );
       }
 
       final imageUrl = Supabase.instance.client.storage
@@ -102,48 +148,114 @@ class _HomeScreenState extends State<HomeScreen> {
           .getPublicUrl('posts/$fileName');
 
       await _createPost(imageUrl, caption, location);
+
+      // Show success dialog
+      if (mounted) {
+        Navigator.of(context).pop();
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return Dialog(
+              child: Container(
+                padding: EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.green, size: 50),
+                    SizedBox(height: 20),
+                    Text(
+                      'Post uploaded successfully!',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+
+        // Auto dismiss success dialog after 1.5 seconds
+        Future.delayed(Duration(milliseconds: 1500), () {
+          if (mounted) {
+            Navigator.of(context).pop();
+            setState(() {
+              _selectedImage = null;
+              _currentIndex = 0; // Switch to feed tab
+            });
+            FeedScreen.refreshFeed(); // Refresh the feed
+          }
+        });
+      }
     } catch (e) {
+      // Handle error
+      if (mounted) {
+        Navigator.of(context).pop();
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Text('Upload Failed'),
+              content: Text('Failed to upload image: $e'),
+              actions: [
+                TextButton(
+                  child: Text('OK'),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            );
+          },
+        );
+      }
       print('Failed to upload image: $e');
     }
   }
 
   Future<void> _createPost(String imageUrl, String caption, String location) async {
     try {
-      final userId = Supabase.instance.client.auth.currentUser?.id ?? 'defaultUserId';
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) return;
 
-      // Fetch username from the 'users' table using the 'userId'
-      final userResponse = await Supabase.instance.client
-          .from('users') // Assuming your users table is named 'users'
-          .select('username')
-          .eq('id', userId)
-          .single();
-
-      final username = userResponse['username'];
-
-      if (username == null) {
-        throw Exception('Username not found for the current user');
-      }
-
-      final response = await Supabase.instance.client
+      // Get current timestamp in UTC
+      final now = DateTime.now().toUtc();
+      
+      await Supabase.instance.client
           .from('posts')
           .insert({
-        'user_id': userId,
-        'username': username,  // Insert the username
-        'image_url': imageUrl,
-        'caption': caption,
-        'location': location,
-        'timestamp': DateTime.now().toIso8601String(),
-      });
+            'user_id': userId,
+            'image_url': imageUrl,
+            'caption': caption,
+            'location': location,
+            'created_at': now.toIso8601String(), // Store UTC timestamp
+            'likes': 0,
+            'liked_users': [],
+          });
 
-      print('Post created successfully');
-      setState(() {
-        _selectedImage = null;
-      });
+      if (mounted) {
+        setState(() {
+          _selectedImage = null;
+          _currentIndex = 0;
+        });
+        // Refresh feed and profile
+        FeedScreen.refreshFeed();
+        _refreshAllScreens();
+      }
     } catch (e) {
-      print('Error: $e');
+      print('Error creating post: $e');
     }
   }
 
+  void _refreshAllScreens() {
+    // Refresh user profile if it's open
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pushReplacementNamed(
+        '/user-profile',
+        arguments: Supabase.instance.client.auth.currentUser?.id,
+      );
+    }
+  }
 
   void _showNewPostModal() {
     showModalBottomSheet(
@@ -177,13 +289,18 @@ class _HomeScreenState extends State<HomeScreen> {
       body: IndexedStack(
         index: _currentIndex,
         children: [
-          FeedScreen(),
+          _feedScreen,
           SearchScreen(),
           Container(),
           NotificationsScreen(),
           ProfileScreen(),
         ],
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showNewPostModal,
+        child: Icon(Icons.add),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         currentIndex: _currentIndex,
@@ -200,8 +317,8 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Search',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.add_circle_outline, size: 30, color: Colors.black),
-            label: 'Post',
+            icon: SizedBox.shrink(),
+            label: '',
           ),
           BottomNavigationBarItem(
             icon: Icon(Ionicons.notifications_outline),
