@@ -13,6 +13,7 @@ class Comment {
   final String? parentId;
   final List<Comment> replies;
   int replyCount;
+  final int level;
 
   Comment({
     required this.id,
@@ -27,9 +28,10 @@ class Comment {
     this.parentId,
     List<Comment>? replies,
     this.replyCount = 0,
+    this.level = 0,
   }) : replies = replies ?? [];
 
-  factory Comment.fromMap(Map<String, dynamic> map) {
+  factory Comment.fromMap(Map<String, dynamic> map, {int level = 0}) {
     return Comment(
       id: map['id']?.toString() ?? '',
       postId: map['post_id']?.toString() ?? '',
@@ -42,6 +44,7 @@ class Comment {
       likes: map['likes']?.toInt() ?? 0,
       likedUsers: List<String>.from(map['liked_users'] ?? []),
       replyCount: map['reply_count']?.toInt() ?? 0,
+      level: level,
     );
   }
 

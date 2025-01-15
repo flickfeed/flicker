@@ -7,11 +7,13 @@ import '../utils/date_formatter.dart';
 class CommentTile extends StatelessWidget {
   final Comment comment;
   final VoidCallback onLike;
-  final Function(String) onReply;
+  final Function(String, String?) onReply;
   final VoidCallback onDelete;
   final bool isReply;
   final bool showReplies;
   final VoidCallback onToggleReplies;
+  final int nestLevel;
+  final String? parentUsername;
 
   const CommentTile({
     Key? key,
@@ -22,10 +24,16 @@ class CommentTile extends StatelessWidget {
     this.isReply = false,
     this.showReplies = false,
     required this.onToggleReplies,
+    this.nestLevel = 0,
+    this.parentUsername,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    // Calculate left padding based on nesting level (max 3 levels)
+    final leftPadding = 16.0 + (nestLevel > 3 ? 3 : nestLevel) * 24.0;
+    final bool hasReplies = comment.replies.isNotEmpty;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -33,10 +41,10 @@ class CommentTile extends StatelessWidget {
           onLongPress: () => _showCommentOptions(context),
           child: Padding(
             padding: EdgeInsets.only(
-              left: isReply ? 48.0 : 16.0,
+              left: leftPadding,
               right: 16.0,
               top: 8.0,
-              bottom: 8.0,
+              bottom: 4.0,
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -53,6 +61,7 @@ class CommentTile extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Username and comment
                       RichText(
                         text: TextSpan(
                           style: DefaultTextStyle.of(context).style,
@@ -62,41 +71,33 @@ class CommentTile extends StatelessWidget {
                               style: TextStyle(fontWeight: FontWeight.bold),
                             ),
                             TextSpan(text: ' '),
-                            TextSpan(text: comment.text),
+                            TextSpan(
+                              text: comment.text,
+                              style: TextStyle(height: 1.4),
+                            ),
+                            TextSpan(text: ' • '),
+                            TextSpan(
+                              text: DateFormatter.getTimeAgo(comment.createdAt),
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 12,
+                              ),
+                            ),
                           ],
                         ),
                       ),
                       SizedBox(height: 4),
+                      // Action buttons row
                       Row(
                         children: [
-                          Text(
-                            DateFormatter.getTimeAgo(comment.createdAt),
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 12,
-                            ),
-                          ),
-                          SizedBox(width: 16),
                           GestureDetector(
-                            onTap: () => onLike(),
-                            child: Text(
-                              'Like',
-                              style: TextStyle(
-                                color: comment.isLiked ? Colors.blue : Colors.grey[600],
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          SizedBox(width: 16),
-                          GestureDetector(
-                            onTap: () => onReply(comment.username),
+                            onTap: () => onReply(comment.username, comment.id),
                             child: Text(
                               'Reply',
                               style: TextStyle(
                                 color: Colors.grey[600],
                                 fontSize: 12,
-                                fontWeight: FontWeight.bold,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ),
@@ -105,37 +106,68 @@ class CommentTile extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (comment.likes > 0)
-                  Container(
-                    padding: EdgeInsets.all(4),
-                    child: Row(
-                      children: [
-                        Icon(Icons.favorite, size: 12, color: Colors.blue),
-                        SizedBox(width: 4),
-                        Text(
-                          comment.likes.toString(),
-                          style: TextStyle(fontSize: 12),
-                        ),
-                      ],
+                // Like button with count
+                Column(
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        comment.isLiked ? Icons.favorite : Icons.favorite_border,
+                        size: 18,
+                        color: comment.isLiked ? Colors.red : Colors.grey,
+                      ),
+                      onPressed: onLike,
+                      constraints: BoxConstraints(minWidth: 40, minHeight: 40),
                     ),
-                  ),
+                    if (comment.likes > 0)
+                      Text(
+                        comment.likes.toString(),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                  ],
+                ),
               ],
             ),
           ),
         ),
-        if (comment.replies.isNotEmpty)
+        // Show replies toggle
+        if (hasReplies)
           Padding(
-            padding: EdgeInsets.only(left: isReply ? 64.0 : 32.0),
+            padding: EdgeInsets.only(left: leftPadding + 40),
             child: TextButton(
               onPressed: onToggleReplies,
-              child: Text(
-                showReplies
-                    ? 'Hide replies'
-                    : 'View ${comment.replies.length} replies',
-                style: TextStyle(color: Colors.grey[600]),
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                minimumSize: Size.zero,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    showReplies 
+                        ? Icons.keyboard_arrow_up 
+                        : Icons.keyboard_arrow_down,
+                    size: 16,
+                    color: Colors.grey[600],
+                  ),
+                  SizedBox(width: 4),
+                  Text(
+                    showReplies
+                        ? 'Hide replies'
+                        : 'View ${comment.replies.length} ${comment.replies.length == 1 ? 'reply' : 'replies'}',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
+        // Replies
         if (showReplies)
           ...comment.replies.map((reply) => CommentTile(
                 comment: reply,
@@ -145,6 +177,8 @@ class CommentTile extends StatelessWidget {
                 isReply: true,
                 showReplies: false,
                 onToggleReplies: () {},
+                nestLevel: nestLevel + 1,
+                parentUsername: comment.username,
               )),
       ],
     );

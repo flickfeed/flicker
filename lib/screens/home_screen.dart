@@ -296,11 +296,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ProfileScreen(),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showNewPostModal,
-        child: Icon(Icons.add),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         currentIndex: _currentIndex,
@@ -317,13 +312,14 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Search',
           ),
           BottomNavigationBarItem(
-            icon: SizedBox.shrink(),
-            label: '',
+            icon: Icon(Ionicons.add_circle_outline, size: 30),
+            activeIcon: Icon(Ionicons.add_circle, size: 30),
+            label: 'Post',
           ),
           BottomNavigationBarItem(
             icon: Icon(Ionicons.notifications_outline),
             activeIcon: Icon(Ionicons.notifications),
-            label: 'Notifications',
+            label: 'Activity',
           ),
           BottomNavigationBarItem(
             icon: Icon(Ionicons.person_outline),

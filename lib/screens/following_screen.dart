@@ -26,12 +26,18 @@ class _FollowingScreenState extends State<FollowingScreen> {
     try {
       final response = await _supabase
           .from('followers')
-          .select('following:userdetails(id, username, avatar_url)')
-          .eq('follower_id', widget.userId)
-          .execute();
+          .select('''
+            following_id,
+            following:userdetails!following_id (
+              id,
+              username,
+              avatar_url,
+              name
+            )
+          ''')
+          .eq('follower_id', widget.userId);
 
-      final following = (response.data as List)
-          .map((item) => item['following'] as Map<String, dynamic>)
+      final following = (response as List).map((item) => item['following'] as Map<String, dynamic>)
           .toList();
 
       setState(() {

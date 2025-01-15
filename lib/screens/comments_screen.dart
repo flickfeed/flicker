@@ -29,8 +29,8 @@ class _CommentsScreenState extends State<CommentsScreen> {
   bool _isLoading = true;
   bool _isPostingComment = false;
   final Map<String, bool> _showReplies = {};
-  String? _replyingTo;
-  String? _highlightedCommentId;
+  String? _replyingToCommentId;
+  String? _replyingToUsername;
 
   @override
   void initState() {
@@ -40,23 +40,24 @@ class _CommentsScreenState extends State<CommentsScreen> {
 
   Future<void> _loadComments() async {
     try {
-      final response = await Supabase.instance.client
+      // First get comments
+      final response = await _supabase
           .from('comments')
           .select()
           .eq('post_id', widget.post.postId)
-          .eq('is_reply', false)
+          .is_('parent_id', null)
           .order('created_at', ascending: true);
 
-      final comments = (response as List<dynamic>)
-          .map((comment) => Comment.fromMap(comment))
-          .toList();
+      final comments = (response as List).map((comment) => Comment.fromMap({
+            ...comment,
+            // Use the username and avatar_url directly from comments table
+            'username': comment['username'],
+            'avatar_url': comment['avatar_url'],
+          })).toList();
 
-      // Load replies for comments with reply_count > 0
+      // Load replies for each comment
       for (var comment in comments) {
-        if (comment.replyCount > 0) {
-          final replies = await _loadReplies(comment.id);
-          comment.replies.addAll(replies);
-        }
+        await _loadRepliesRecursively(comment);
       }
 
       setState(() {
@@ -69,20 +70,28 @@ class _CommentsScreenState extends State<CommentsScreen> {
     }
   }
 
-  Future<List<Comment>> _loadReplies(String parentId) async {
+  Future<void> _loadRepliesRecursively(Comment parentComment) async {
     try {
-      final response = await Supabase.instance.client
+      final response = await _supabase
           .from('comments')
           .select()
-          .eq('parent_id', parentId)
+          .eq('parent_id', parentComment.id)
           .order('created_at', ascending: true);
 
-      return (response as List<dynamic>)
-          .map((reply) => Comment.fromMap(reply))
-          .toList();
+      final replies = (response as List).map((reply) => Comment.fromMap({
+            ...reply,
+            'username': reply['username'],
+            'avatar_url': reply['avatar_url'],
+          }, level: parentComment.level + 1)).toList();
+
+      // Load nested replies
+      for (var reply in replies) {
+        await _loadRepliesRecursively(reply);
+      }
+
+      parentComment.replies.addAll(replies);
     } catch (e) {
       print('Error loading replies: $e');
-      return [];
     }
   }
 
@@ -95,56 +104,106 @@ class _CommentsScreenState extends State<CommentsScreen> {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) return;
 
-      // Get user details
+      // Get current user details
       final userResponse = await _supabase
           .from('userdetails')
           .select('username, avatar_url')
           .eq('id', userId)
           .single();
 
-      // Use the userResponse to extract username and avatar_url
-      final username = userResponse['username'];
-      final avatarUrl = userResponse['avatar_url'];
+      // Create the comment text
+      String commentText = _commentController.text.trim();
+      if (_replyingToUsername != null && !commentText.startsWith('@')) {
+        commentText = '@$_replyingToUsername $commentText';
+      }
 
-      // Create comment
+      // Create the comment
       final comment = {
         'post_id': widget.post.postId,
         'user_id': userId,
-        'text': _commentController.text.trim(),
-        'username': username,
-        'avatar_url': avatarUrl,
+        'text': commentText,
+        'username': userResponse['username'],
+        'avatar_url': userResponse['avatar_url'],
         'created_at': DateTime.now().toIso8601String(),
+        'parent_id': _replyingToCommentId,
+        'likes': 0,
+        'liked_users': [],
+        'is_reply': _replyingToCommentId != null,
       };
 
-      await _supabase.from('comments').insert(comment);
+      // Insert the comment
+      final response = await _supabase
+          .from('comments')
+          .insert(comment)
+          .select()
+          .single();
 
-      // Create notification for comment
-      if (widget.post.userId != userId) {  // Don't notify if user comments on their own post
+      // If this is a reply, update the parent comment's reply count
+      if (_replyingToCommentId != null) {
+        // First get current reply count
+        final parentComment = await _supabase
+            .from('comments')
+            .select('reply_count')
+            .eq('id', _replyingToCommentId)
+            .single();
+        
+        final currentReplyCount = parentComment['reply_count'] as int? ?? 0;
+
+        // Then update with incremented count
+        await _supabase
+            .from('comments')
+            .update({'reply_count': currentReplyCount + 1})
+            .eq('id', _replyingToCommentId);
+
+        // Add the new reply to the parent comment in the UI
+        final parentIndex = _comments.indexWhere((c) => c.id == _replyingToCommentId);
+        if (parentIndex != -1) {
+          setState(() {
+            _comments[parentIndex].replies.add(Comment.fromMap(response));
+            _showReplies[_replyingToCommentId!] = true; // Show replies after adding new one
+          });
+        }
+      } else {
+        // Add new top-level comment to the UI
+        setState(() {
+          _comments.add(Comment.fromMap(response));
+        });
+      }
+
+      // Update post comment count
+      await widget.post.updateCommentCount(widget.post.commentCount + 1);
+
+      // Create notification
+      if (widget.post.userId != userId) {
         await _supabase.from('notifications').insert({
           'recipient_id': widget.post.userId,
           'sender_id': userId,
           'type': 'comment',
-          'content': _commentController.text.trim(),
           'post_id': widget.post.postId,
-          'created_at': DateTime.now().toUtc().toIso8601String(),
+          'content': _commentController.text.trim(),
+          'created_at': DateTime.now().toIso8601String(),
         });
       }
 
       if (mounted) {
-        widget.onCommentAdded();  // Call the callback to update the post
+        _commentController.clear();
         setState(() {
-          _comments.add(Comment.fromMap(comment));
-          _commentController.clear();
+          _replyingToCommentId = null;
+          _replyingToUsername = null;
         });
+        widget.onCommentAdded();
       }
-
     } catch (e) {
       print('Error posting comment: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error posting comment')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error posting comment')),
+        );
+      }
     } finally {
-      setState(() => _isPostingComment = false);
+      if (mounted) {
+        setState(() => _isPostingComment = false);
+      }
     }
   }
 
@@ -274,6 +333,15 @@ class _CommentsScreenState extends State<CommentsScreen> {
     }
   }
 
+  void _handleReply(String username, String? commentId) {
+    setState(() {
+      _replyingToUsername = username;
+      _replyingToCommentId = commentId;
+      _commentController.text = '@$username ';
+    });
+    FocusScope.of(context).requestFocus(FocusNode());
+  }
+
   @override
   void dispose() {
     _commentController.dispose();
@@ -328,11 +396,7 @@ class _CommentsScreenState extends State<CommentsScreen> {
                       child: CommentTile(
                         comment: comment,
                         onLike: () => _toggleLikeComment(comment),
-                        onReply: (username) {
-                          setState(() => _replyingTo = comment.id);
-                          _commentController.text = '@$username ';
-                          FocusScope.of(context).requestFocus(FocusNode());
-                        },
+                        onReply: (username, commentId) => _handleReply(username, commentId),
                         onDelete: () async {
                           await _deleteComment(comment.id);
                           setState(() {
@@ -351,55 +415,76 @@ class _CommentsScreenState extends State<CommentsScreen> {
                 ),
         ),
         // Comment input
-        Padding(
-          padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.of(context).viewInsets.bottom + 8),
-          child: Row(
-            children: [
-              CircleAvatar(
-                backgroundImage: avatarUrl != null
-                    ? NetworkImage(avatarUrl)
-                    : null,
-                child: avatarUrl == null
-                    ? Icon(Icons.person)
-                    : null,
-                radius: 16,
-              ),
-              SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  controller: _commentController,
-                  decoration: InputDecoration(
-                    hintText: 'Add a comment...',
-                    border: InputBorder.none,
-                  ),
-                  maxLines: null,
-                ),
-              ),
-              if (_isPostingComment)
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8.0),
-                  child: SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                )
-              else
-                TextButton(
-                  onPressed: _postComment,
-                  child: Text(
-                    'Post',
-                    style: TextStyle(
-                      color: _commentController.text.trim().isEmpty
-                          ? Colors.blue.withOpacity(0.5)
-                          : Colors.blue,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
+        _buildCommentInput(),
       ],
+    );
+  }
+
+  Widget _buildCommentInput() {
+    return Container(
+      padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.of(context).viewInsets.bottom + 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        border: Border(top: BorderSide(color: Colors.grey[300]!)),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 16,
+            backgroundImage: _supabase.auth.currentUser?.userMetadata?['avatar_url'] != null
+                ? NetworkImage(_supabase.auth.currentUser!.userMetadata!['avatar_url'])
+                : null,
+            child: _supabase.auth.currentUser?.userMetadata?['avatar_url'] == null
+                ? Icon(Icons.person)
+                : null,
+          ),
+          SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              controller: _commentController,
+              decoration: InputDecoration(
+                hintText: _replyingToUsername != null 
+                    ? '@$_replyingToUsername' 
+                    : 'Add a comment...',
+                border: InputBorder.none,
+              ),
+              onChanged: (value) {
+                if (_replyingToUsername != null && 
+                    !value.startsWith('@$_replyingToUsername') &&
+                    value.isNotEmpty) {
+                  // Only add @username if it's not already there and field is not empty
+                  _commentController.text = '@$_replyingToUsername $value';
+                  _commentController.selection = TextSelection.fromPosition(
+                    TextPosition(offset: _commentController.text.length),
+                  );
+                }
+              },
+              maxLines: null,
+            ),
+          ),
+          if (_isPostingComment)
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else
+            TextButton(
+              onPressed: _postComment,
+              child: Text(
+                'Post',
+                style: TextStyle(
+                  color: _commentController.text.trim().isEmpty
+                      ? Colors.blue.withOpacity(0.5)
+                      : Colors.blue,
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

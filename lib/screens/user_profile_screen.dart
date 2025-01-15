@@ -236,6 +236,158 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
     }
   }
 
+  Future<void> _removeFollower() async {
+    try {
+      final currentUserId = _supabase.auth.currentUser?.id;
+      if (currentUserId == null) return;
+
+      // Remove follower relationship
+      await _supabase
+          .from('followers')
+          .delete()
+          .eq('follower_id', widget.userId)
+          .eq('following_id', currentUserId);
+
+      // Refresh follow counts
+      await _loadFollowCounts();
+      await _checkFollowStatus();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Follower removed')),
+        );
+      }
+    } catch (e) {
+      print('Error removing follower: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to remove follower')),
+        );
+      }
+    }
+  }
+
+  Future<void> _blockUser() async {
+    try {
+      final currentUserId = _supabase.auth.currentUser?.id;
+      if (currentUserId == null) return;
+
+      // Add to blocked users table
+      await _supabase.from('blocked_users').insert({
+        'blocker_id': currentUserId,
+        'blocked_id': widget.userId,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      // Remove any existing follow relationships
+      await Future.wait([
+        _supabase
+            .from('followers')
+            .delete()
+            .eq('follower_id', widget.userId)
+            .eq('following_id', currentUserId),
+        _supabase
+            .from('followers')
+            .delete()
+            .eq('follower_id', currentUserId)
+            .eq('following_id', widget.userId),
+      ]);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('User blocked')),
+        );
+        Navigator.of(context).pop(); // Return to previous screen
+      }
+    } catch (e) {
+      print('Error blocking user: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to block user')),
+        );
+      }
+    }
+  }
+
+  void _showOptionsMenu() {
+    showModalBottomSheet(
+      context: context,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(15)),
+      ),
+      builder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: Icon(Icons.person_remove, color: Colors.orange),
+            title: Text('Remove follower'),
+            onTap: () {
+              Navigator.pop(context);
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: Text('Remove Follower'),
+                  content: Text('Are you sure you want to remove this follower?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _removeFollower();
+                      },
+                      child: Text('Remove'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.red,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: Icon(Icons.block, color: Colors.red),
+            title: Text('Block user'),
+            onTap: () {
+              Navigator.pop(context);
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: Text('Block User'),
+                  content: Text(
+                    'Are you sure you want to block this user? They won\'t be able to:'
+                    '\n\n• Follow you'
+                    '\n• View your posts'
+                    '\n• Find your profile'
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _blockUser();
+                      },
+                      child: Text('Block'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.red,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isCurrentUser = widget.userId == _supabase.auth.currentUser?.id;
@@ -244,6 +396,14 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.username),
+        actions: [
+          // Only show options menu if viewing another user's profile
+          if (_supabase.auth.currentUser?.id != widget.userId)
+            IconButton(
+              icon: Icon(Icons.more_vert),
+              onPressed: _showOptionsMenu,
+            ),
+        ],
       ),
       body: _isLoading
           ? Center(child: CircularProgressIndicator())

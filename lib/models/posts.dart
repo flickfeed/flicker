@@ -86,10 +86,10 @@ class Post {
           .update({'comment_count': newCount})
           .eq('id', postId);
       
-      commentCount = newCount;  // Update local state after successful DB update
+      commentCount = newCount;
     } catch (e) {
       print('Error updating comment count: $e');
-      throw e;  // Rethrow to handle in UI
+      throw e;
     }
   }
 }

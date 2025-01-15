@@ -27,12 +27,18 @@ class _FollowersScreenState extends State<FollowersScreen> {
     try {
       final response = await _supabase
           .from('followers')
-          .select('follower:users(id, username, avatar_url)')
-          .eq('following_id', widget.userId)
-          .execute();
+          .select('''
+            follower_id,
+            follower:userdetails!follower_id (
+              id,
+              username,
+              avatar_url,
+              name
+            )
+          ''')
+          .eq('following_id', widget.userId);
 
-      final followers = (response as List)
-          .map((item) => item['follower'] as Map<String, dynamic>)
+      final followers = (response as List).map((item) => item['follower'] as Map<String, dynamic>)
           .toList();
 
       // Check following status for each follower
